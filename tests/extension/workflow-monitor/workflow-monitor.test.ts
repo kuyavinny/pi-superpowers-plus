@@ -153,6 +153,34 @@ describe("WorkflowHandler", () => {
     handler.handleBashResult("npx vitest run", "1 failing", 1);
     expect(handler.getWidgetText()).toContain("Debug");
   });
+
+  describe("verification monitor", () => {
+    test("returns violation on git commit without verification", () => {
+      const result = handler.checkCommitGate("git commit -m 'feat'");
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe("commit-without-verification");
+    });
+
+    test("returns null on git commit after test run", () => {
+      handler.handleBashResult("npx vitest run", "1 passed", 0);
+      const result = handler.checkCommitGate("git commit -m 'feat'");
+      expect(result).toBeNull();
+    });
+
+    test("invalidates verification after source write", () => {
+      handler.handleBashResult("npx vitest run", "1 passed", 0);
+      handler.handleToolCall("write", { path: "src/index.ts" });
+      const result = handler.checkCommitGate("git commit -m 'feat'");
+      expect(result).not.toBeNull();
+    });
+
+    test("resets verification on session reset", () => {
+      handler.handleBashResult("npx vitest run", "1 passed", 0);
+      handler.resetState();
+      const result = handler.checkCommitGate("git commit -m 'feat'");
+      expect(result).not.toBeNull();
+    });
+  });
 });
 
 function failOutput() {
