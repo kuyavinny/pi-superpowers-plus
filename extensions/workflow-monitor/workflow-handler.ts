@@ -3,6 +3,7 @@ import { isSourceFile } from "./heuristics";
 import { isInvestigationCommand } from "./investigation";
 import { TddMonitor, type TddPhase, type TddViolation } from "./tdd-monitor";
 import { parseTestCommand, parseTestResult } from "./test-runner";
+import { VerificationMonitor, type VerificationViolation } from "./verification-monitor";
 
 export type Violation = TddViolation | DebugViolation;
 
@@ -20,6 +21,7 @@ export interface WorkflowHandler {
   getTddPhase(): string;
   getWidgetText(): string;
   getTddState(): ReturnType<TddMonitor["getState"]>;
+  checkCommitGate(command: string): VerificationViolation | null;
   restoreTddState(
     phase: TddPhase,
     testFiles: string[],
@@ -32,6 +34,7 @@ export interface WorkflowHandler {
 export function createWorkflowHandler(): WorkflowHandler {
   const tdd = new TddMonitor();
   const debug = new DebugMonitor();
+  const verification = new VerificationMonitor();
   let debugFailStreak = 0;
 
   return {
@@ -39,6 +42,10 @@ export function createWorkflowHandler(): WorkflowHandler {
       if (toolName === "write" || toolName === "edit") {
         const path = input.path as string | undefined;
         if (path) {
+          if (isSourceFile(path)) {
+            verification.onSourceWritten();
+          }
+
           // Debug violations take precedence, and when debug is active we don't
           // additionally enforce TDD write-order violations.
           if (debug.isActive() && isSourceFile(path)) {
@@ -74,6 +81,12 @@ export function createWorkflowHandler(): WorkflowHandler {
       if (parseTestCommand(command)) {
         const passed = parseTestResult(output, exitCode);
         if (passed !== null) {
+          if (passed) {
+            verification.recordVerification();
+          } else {
+            verification.reset();
+          }
+
           const excludeFromDebug =
             !passed && tdd.getPhase() === "red" && tdd.isRedVerificationPending();
 
@@ -129,6 +142,10 @@ export function createWorkflowHandler(): WorkflowHandler {
       return tdd.getState();
     },
 
+    checkCommitGate(command: string) {
+      return verification.checkCommitGate(command);
+    },
+
     restoreTddState(
       phase: TddPhase,
       testFiles: string[],
@@ -142,6 +159,7 @@ export function createWorkflowHandler(): WorkflowHandler {
       debugFailStreak = 0;
       tdd.onCommit();
       debug.onCommit();
+      verification.reset();
     },
   };
 }

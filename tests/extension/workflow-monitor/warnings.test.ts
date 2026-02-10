@@ -1,5 +1,9 @@
 import { describe, test, expect } from "vitest";
-import { getTddViolationWarning, getDebugViolationWarning } from "../../../extensions/workflow-monitor/warnings";
+import {
+  getTddViolationWarning,
+  getDebugViolationWarning,
+  getVerificationViolationWarning,
+} from "../../../extensions/workflow-monitor/warnings";
 
 describe("getTddViolationWarning", () => {
   test("returns warning for source-before-test violation", () => {
@@ -47,5 +51,24 @@ describe("getDebugViolationWarning", () => {
   test("returns excessive-fix-attempts warning with higher count", () => {
     const warning = getDebugViolationWarning("excessive-fix-attempts", "src/foo.ts", 5);
     expect(warning).toContain("fix attempt #5");
+  });
+});
+
+describe("getVerificationViolationWarning", () => {
+  test("warns about commit without verification", () => {
+    const msg = getVerificationViolationWarning("commit-without-verification", "git commit -m 'feat'");
+    expect(msg).toContain("VERIFICATION");
+    expect(msg).toContain("git commit");
+    expect(msg).toContain("Run the test");
+  });
+
+  test("warns about push without verification", () => {
+    const msg = getVerificationViolationWarning("push-without-verification", "git push");
+    expect(msg).toContain("push");
+  });
+
+  test("warns about PR without verification", () => {
+    const msg = getVerificationViolationWarning("pr-without-verification", "gh pr create");
+    expect(msg).toContain("PR");
   });
 });

@@ -36,6 +36,11 @@ You're in RED. Run the test. Watch it fail. THEN write the production code.
 
 export type DebugViolationType = "fix-without-investigation" | "excessive-fix-attempts";
 
+export type VerificationViolationType =
+  | "commit-without-verification"
+  | "push-without-verification"
+  | "pr-without-verification";
+
 export function getDebugViolationWarning(
   type: DebugViolationType,
   file: string,
@@ -79,4 +84,27 @@ Discuss with your human partner before attempting more fixes.
   }
 
   return `⚠️ DEBUG WARNING: Unexpected violation type "${type}" for ${file}`;
+}
+
+export function getVerificationViolationWarning(
+  type: VerificationViolationType,
+  command: string
+): string {
+  const action =
+    type === "commit-without-verification"
+      ? "commit"
+      : type === "push-without-verification"
+        ? "push"
+        : "create a PR";
+
+  return `
+⚠️ VERIFICATION REQUIRED: You're about to ${action} without running verification.
+
+Command: ${command}
+
+Run the test/build/lint command FIRST. Read the output. Confirm it passes.
+THEN ${action}.
+
+Evidence before claims. No shortcuts.
+`.trim();
 }

@@ -13,8 +13,13 @@ import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Text } from "@mariozechner/pi-tui";
 import { createWorkflowHandler, type Violation } from "./workflow-monitor/workflow-handler";
+import { type VerificationViolation } from "./workflow-monitor/verification-monitor";
 import { getTddViolationWarning } from "./workflow-monitor/warnings";
-import { getDebugViolationWarning, type DebugViolationType } from "./workflow-monitor/warnings";
+import {
+  getDebugViolationWarning,
+  getVerificationViolationWarning,
+  type DebugViolationType,
+} from "./workflow-monitor/warnings";
 import { loadReference, REFERENCE_TOPICS } from "./workflow-monitor/reference-tool";
 
 export default function (pi: ExtensionAPI) {
@@ -23,6 +28,7 @@ export default function (pi: ExtensionAPI) {
   // Pending violation: set during tool_call, injected during tool_result.
   // Scoped here because tool_call and tool_result fire sequentially per call.
   let pendingViolation: Violation | null = null;
+  let pendingVerificationViolation: VerificationViolation | null = null;
 
   // --- State reconstruction on session events ---
   for (const event of [
@@ -34,12 +40,21 @@ export default function (pi: ExtensionAPI) {
     pi.on(event, async (_event, ctx) => {
       handler.resetState();
       pendingViolation = null;
+      pendingVerificationViolation = null;
       updateWidget(ctx);
     });
   }
 
-  // --- Tool call observation (detect file writes) ---
+  // --- Tool call observation (detect file writes + verification gate) ---
   pi.on("tool_call", async (event, _ctx) => {
+    if (event.toolName === "bash") {
+      const command = ((event.input as Record<string, any>).command as string | undefined) ?? "";
+      const verificationViolation = handler.checkCommitGate(command);
+      if (verificationViolation) {
+        pendingVerificationViolation = verificationViolation;
+      }
+    }
+
     const result = handler.handleToolCall(event.toolName, event.input as Record<string, any>);
     pendingViolation = result.violation;
   });
@@ -77,8 +92,23 @@ export default function (pi: ExtensionAPI) {
         .join("\n");
       const exitCode = (event.details as any)?.exitCode as number | undefined;
       handler.handleBashResult(command, output, exitCode);
+
+      if (pendingVerificationViolation) {
+        const violation = pendingVerificationViolation;
+        pendingVerificationViolation = null;
+        const warning = getVerificationViolationWarning(violation.type, violation.command);
+        const existingText = event.content
+          .filter((c): c is { type: "text"; text: string } => c.type === "text")
+          .map((c) => c.text)
+          .join("\n");
+        updateWidget(ctx);
+        return {
+          content: [{ type: "text", text: `${existingText}\n\n${warning}` }],
+        };
+      }
     }
 
+    pendingVerificationViolation = null;
     updateWidget(ctx);
     return undefined;
   });
