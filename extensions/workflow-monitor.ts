@@ -21,6 +21,11 @@ import {
   type DebugViolationType,
 } from "./workflow-monitor/warnings";
 import { loadReference, REFERENCE_TOPICS } from "./workflow-monitor/reference-tool";
+import {
+  WORKFLOW_PHASES,
+  WORKFLOW_TRACKER_ENTRY_TYPE,
+  type WorkflowTrackerState,
+} from "./workflow-monitor/workflow-tracker";
 
 export default function (pi: ExtensionAPI) {
   const handler = createWorkflowHandler();
@@ -29,6 +34,10 @@ export default function (pi: ExtensionAPI) {
   // Scoped here because tool_call and tool_result fire sequentially per call.
   let pendingViolation: Violation | null = null;
   let pendingVerificationViolation: VerificationViolation | null = null;
+
+  const persistWorkflowState = () => {
+    pi.appendEntry(WORKFLOW_TRACKER_ENTRY_TYPE, handler.getWorkflowState());
+  };
 
   // --- State reconstruction on session events ---
   for (const event of [
@@ -39,14 +48,25 @@ export default function (pi: ExtensionAPI) {
   ] as const) {
     pi.on(event, async (_event, ctx) => {
       handler.resetState();
+      handler.restoreWorkflowStateFromBranch(ctx.sessionManager.getBranch());
       pendingViolation = null;
       pendingVerificationViolation = null;
       updateWidget(ctx);
     });
   }
 
+  // --- Input observation (skill detection) ---
+  pi.on("input", async (event, ctx) => {
+    if (event.source === "extension") return;
+    const text = (event.input as string | undefined) ?? "";
+    if (handler.handleInputText(text)) {
+      persistWorkflowState();
+      updateWidget(ctx);
+    }
+  });
+
   // --- Tool call observation (detect file writes + verification gate) ---
-  pi.on("tool_call", async (event, _ctx) => {
+  pi.on("tool_call", async (event, ctx) => {
     if (event.toolName === "bash") {
       const command = ((event.input as Record<string, any>).command as string | undefined) ?? "";
       const verificationViolation = handler.checkCommitGate(command);
@@ -55,8 +75,27 @@ export default function (pi: ExtensionAPI) {
       }
     }
 
-    const result = handler.handleToolCall(event.toolName, event.input as Record<string, any>);
+    const input = event.input as Record<string, any>;
+    const result = handler.handleToolCall(event.toolName, input);
     pendingViolation = result.violation;
+
+    let changed = false;
+
+    if (event.toolName === "write" || event.toolName === "edit") {
+      const path = input.path as string | undefined;
+      if (path) {
+        changed = handler.handleFileWritten(path) || changed;
+      }
+    }
+
+    if (event.toolName === "plan_tracker") {
+      changed = handler.handlePlanTrackerToolCall(input) || changed;
+    }
+
+    if (changed) {
+      persistWorkflowState();
+      updateWidget(ctx);
+    }
   });
 
   // --- Tool result modification (inject warnings + track investigation) ---
@@ -125,45 +164,75 @@ export default function (pi: ExtensionAPI) {
     );
   }
 
+  function formatPhaseStrip(state: WorkflowTrackerState | null, theme: any): string {
+    if (!state?.currentPhase) return "";
+
+    const arrow = theme.fg("dim", " → ");
+    return WORKFLOW_PHASES.map((phase) => {
+      const status = state.phases[phase];
+      if (state.currentPhase === phase) return theme.fg("accent", `[${phase}]`);
+      if (status === "complete") return theme.fg("success", `✓${phase}`);
+      if (status === "skipped") return theme.fg("dim", `–${phase}`);
+      return theme.fg("dim", phase);
+    }).join(arrow);
+  }
+
   // --- TUI Widget ---
   function updateWidget(ctx: ExtensionContext) {
     if (!ctx.hasUI) return;
-    const text = handler.getWidgetText();
-    if (!text) {
+
+    const tddPhase = handler.getTddPhase().toUpperCase();
+    const hasDebug = handler.isDebugActive();
+    const workflow = handler.getWorkflowState();
+    const hasWorkflow = !!workflow?.currentPhase;
+
+    if (!hasWorkflow && tddPhase === "IDLE" && !hasDebug) {
       ctx.ui.setWidget("workflow_monitor", undefined);
-    } else {
-      ctx.ui.setWidget("workflow_monitor", (_tui, theme) => {
-        const parts: string[] = [];
-
-        // TDD phase
-        const tddPhase = handler.getTddPhase().toUpperCase();
-        if (tddPhase !== "IDLE") {
-          const colorMap: Record<string, string> = {
-            RED: "error",
-            GREEN: "success",
-            REFACTOR: "accent",
-          };
-          parts.push(theme.fg(colorMap[tddPhase] ?? "muted", `TDD: ${tddPhase}`));
-        }
-
-        // Debug state
-        if (handler.isDebugActive()) {
-          const attempts = handler.getDebugFixAttempts();
-          if (attempts >= 3) {
-            parts.push(theme.fg("error", `Debug: ${attempts} fix attempts ⚠️`));
-          } else if (attempts > 0) {
-            parts.push(theme.fg("warning", `Debug: ${attempts} fix attempt${attempts !== 1 ? "s" : ""}`));
-          } else {
-            parts.push(theme.fg("accent", "Debug: investigating"));
-          }
-        }
-
-        return parts.length > 0
-          ? new Text(parts.join(theme.fg("dim", "  |  ")), 0, 0)
-          : undefined;
-      });
+      return;
     }
+
+    ctx.ui.setWidget("workflow_monitor", (_tui, theme) => {
+      const parts: string[] = [];
+
+      const phaseStrip = formatPhaseStrip(workflow, theme);
+      if (phaseStrip) {
+        parts.push(phaseStrip);
+      }
+
+      // TDD phase
+      if (tddPhase !== "IDLE") {
+        const colorMap: Record<string, string> = {
+          RED: "error",
+          GREEN: "success",
+          REFACTOR: "accent",
+        };
+        parts.push(theme.fg(colorMap[tddPhase] ?? "muted", `TDD: ${tddPhase}`));
+      }
+
+      // Debug state
+      if (hasDebug) {
+        const attempts = handler.getDebugFixAttempts();
+        if (attempts >= 3) {
+          parts.push(theme.fg("error", `Debug: ${attempts} fix attempts ⚠️`));
+        } else if (attempts > 0) {
+          parts.push(theme.fg("warning", `Debug: ${attempts} fix attempt${attempts !== 1 ? "s" : ""}`));
+        } else {
+          parts.push(theme.fg("accent", "Debug: investigating"));
+        }
+      }
+
+      return parts.length > 0
+        ? new Text(parts.join(theme.fg("dim", "  |  ")), 0, 0)
+        : undefined;
+    });
   }
+
+  pi.registerCommand("workflow-next", {
+    description: "Start a fresh session for the next workflow phase",
+    async handler(_args, _ctx) {
+      // Implemented in detail below during workflow-next task.
+    },
+  });
 
   // --- Reference Tool ---
   pi.registerTool({
