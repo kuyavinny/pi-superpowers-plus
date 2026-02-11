@@ -1,3 +1,5 @@
+import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+
 export const WORKFLOW_PHASES = [
   "brainstorm",
   "plan",
@@ -36,6 +38,8 @@ function emptyState(): WorkflowTrackerState {
 
   return { phases, currentPhase: null, artifacts, prompted };
 }
+
+export const WORKFLOW_TRACKER_ENTRY_TYPE = "workflow_tracker_state";
 
 const PLANS_DIR_RE = /^docs\/plans\//;
 const DESIGN_RE = /-design\.md$/;
@@ -143,5 +147,20 @@ export class WorkflowTracker {
 
   onPlanTrackerInit(): boolean {
     return this.advanceTo("execute");
+  }
+
+  static reconstructFromBranch(branch: SessionEntry[]): WorkflowTrackerState | null {
+    let last: WorkflowTrackerState | null = null;
+
+    for (const entry of branch) {
+      if (entry.type !== "custom") continue;
+      if ((entry as any).customType !== WORKFLOW_TRACKER_ENTRY_TYPE) continue;
+      const data = (entry as any).data as WorkflowTrackerState | undefined;
+      if (data && typeof data === "object") {
+        last = cloneState(data);
+      }
+    }
+
+    return last;
   }
 }

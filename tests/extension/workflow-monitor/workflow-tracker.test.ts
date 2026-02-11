@@ -1,3 +1,4 @@
+import type { SessionEntry } from "@mariozechner/pi-coding-agent";
 import { describe, test, expect, beforeEach } from "vitest";
 import { WorkflowTracker, WORKFLOW_PHASES } from "../../../extensions/workflow-monitor/workflow-tracker";
 
@@ -43,6 +44,17 @@ describe("WorkflowTracker", () => {
   });
 });
 
+function custom(data: any): SessionEntry {
+  return {
+    type: "custom",
+    id: "x",
+    parentId: null,
+    timestamp: Date.now(),
+    customType: "workflow_tracker_state",
+    data,
+  } as any;
+}
+
 describe("WorkflowTracker detection helpers", () => {
   test("detects /skill:brainstorming and advances to brainstorm", () => {
     const tracker = new WorkflowTracker();
@@ -71,5 +83,22 @@ describe("WorkflowTracker detection helpers", () => {
     const tracker = new WorkflowTracker();
     tracker.onPlanTrackerInit();
     expect(tracker.getState().currentPhase).toBe("execute");
+  });
+
+  test("reconstructFromBranch returns last saved state", () => {
+    const tracker = new WorkflowTracker();
+    tracker.advanceTo("plan");
+    const s1 = tracker.getState();
+
+    tracker.advanceTo("execute");
+    const s2 = tracker.getState();
+
+    const reconstructed = WorkflowTracker.reconstructFromBranch([
+      custom(s1),
+      { type: "message" } as any,
+      custom(s2),
+    ] as any);
+
+    expect(reconstructed?.currentPhase).toBe("execute");
   });
 });
