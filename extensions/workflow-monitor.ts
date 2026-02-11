@@ -24,8 +24,11 @@ import { loadReference, REFERENCE_TOPICS } from "./workflow-monitor/reference-to
 import {
   WORKFLOW_PHASES,
   WORKFLOW_TRACKER_ENTRY_TYPE,
+  computeBoundaryToPrompt,
+  type TransitionBoundary,
   type WorkflowTrackerState,
 } from "./workflow-monitor/workflow-tracker";
+import { getTransitionPrompt } from "./workflow-monitor/workflow-transitions";
 
 export default function (pi: ExtensionAPI) {
   const handler = createWorkflowHandler();
@@ -37,6 +40,23 @@ export default function (pi: ExtensionAPI) {
 
   const persistWorkflowState = () => {
     pi.appendEntry(WORKFLOW_TRACKER_ENTRY_TYPE, handler.getWorkflowState());
+  };
+
+  const phaseToSkill: Record<string, string> = {
+    brainstorm: "brainstorming",
+    plan: "writing-plans",
+    execute: "executing-plans",
+    verify: "verification-before-completion",
+    review: "requesting-code-review",
+    finish: "finishing-a-development-branch",
+  };
+
+  const boundaryToPhase: Record<TransitionBoundary, keyof typeof phaseToSkill> = {
+    design_committed: "brainstorm",
+    plan_ready: "plan",
+    execution_complete: "execute",
+    verification_passed: "verify",
+    review_complete: "review",
   };
 
   // --- State reconstruction on session events ---
@@ -150,6 +170,63 @@ export default function (pi: ExtensionAPI) {
     pendingVerificationViolation = null;
     updateWidget(ctx);
     return undefined;
+  });
+
+  // --- Boundary prompting at natural handoff points ---
+  pi.on("agent_end", async (_event, ctx) => {
+    if (!ctx.hasUI) return;
+
+    const state = handler.getWorkflowState();
+    if (!state) return;
+
+    let changed = false;
+    if (state.currentPhase && state.phases[state.currentPhase] === "active") {
+      changed = handler.completeCurrentWorkflowPhase() || changed;
+    }
+
+    const latestState = handler.getWorkflowState();
+    if (!latestState) return;
+
+    const boundary = computeBoundaryToPrompt(latestState);
+    if (!boundary) {
+      if (changed) {
+        persistWorkflowState();
+        updateWidget(ctx);
+      }
+      return;
+    }
+
+    const boundaryPhase = boundaryToPhase[boundary];
+    const prompt = getTransitionPrompt(boundary, latestState.artifacts[boundaryPhase]);
+
+    const options = prompt.options.map((o) => ({ label: o.label, value: o.choice }));
+    const result = await ctx.ui.select(prompt.title, options as any);
+
+    const selected =
+      typeof result === "string"
+        ? prompt.options.find((o) => o.choice === result || o.label === result)?.choice
+        : result?.value ?? result?.choice ?? null;
+
+    const marked = handler.markWorkflowPromptedCurrent();
+    if (marked) {
+      persistWorkflowState();
+      updateWidget(ctx);
+    }
+
+    const nextSkill = phaseToSkill[prompt.nextPhase] ?? "writing-plans";
+    const nextInSession = `/skill:${nextSkill}`;
+    const fresh = `/workflow-next ${prompt.nextPhase}${prompt.artifactPath ? ` ${prompt.artifactPath}` : ""}`;
+
+    if (selected === "next") {
+      ctx.ui.setEditorText(nextInSession);
+    } else if (selected === "fresh") {
+      ctx.ui.setEditorText(fresh);
+    } else if (selected === "skip") {
+      handler.advanceWorkflowTo(prompt.nextPhase);
+      persistWorkflowState();
+      updateWidget(ctx);
+      ctx.ui.setEditorText(nextInSession);
+    }
   });
 
   // --- Format violation warning based on type ---

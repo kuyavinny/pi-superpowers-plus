@@ -19,6 +19,32 @@ export interface WorkflowTrackerState {
   prompted: Record<Phase, boolean>;
 }
 
+export type TransitionBoundary =
+  | "design_committed"
+  | "plan_ready"
+  | "execution_complete"
+  | "verification_passed"
+  | "review_complete";
+
+export function computeBoundaryToPrompt(state: WorkflowTrackerState): TransitionBoundary | null {
+  if (state.phases.brainstorm === "complete" && !state.prompted.brainstorm) {
+    return "design_committed";
+  }
+  if (state.phases.plan === "complete" && !state.prompted.plan) {
+    return "plan_ready";
+  }
+  if (state.phases.execute === "complete" && !state.prompted.execute) {
+    return "execution_complete";
+  }
+  if (state.phases.verify === "complete" && !state.prompted.verify) {
+    return "verification_passed";
+  }
+  if (state.phases.review === "complete" && !state.prompted.review) {
+    return "review_complete";
+  }
+  return null;
+}
+
 function cloneState(state: WorkflowTrackerState): WorkflowTrackerState {
   return JSON.parse(JSON.stringify(state)) as WorkflowTrackerState;
 }
