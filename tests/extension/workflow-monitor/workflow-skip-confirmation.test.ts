@@ -571,6 +571,45 @@ describe("multiline /skill input: gate applies to furthest target phase", () => 
     expect(ctx.ui.select).not.toHaveBeenCalled();
   });
 
+  test("XML skill input is detected for skip-confirmation gating", async () => {
+    const state = createWorkflowState({}, null);
+    const { fake, onSessionSwitch, onInput } = setupWithState(state);
+
+    let selectCalled = false;
+    const ctx = {
+      hasUI: true,
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "custom",
+            customType: WORKFLOW_TRACKER_ENTRY_TYPE,
+            data: createWorkflowState({}, null),
+          },
+        ],
+      },
+      ui: {
+        setWidget: () => {},
+        select: async (_title: string, _options: string[]) => {
+          selectCalled = true;
+          return "Cancel";
+        },
+        setEditorText: () => {},
+        notify: () => {},
+      },
+    };
+
+    await onSessionSwitch({}, ctx);
+
+    // Input with XML skill that targets review phase — brainstorm/plan/execute/verify are unresolved
+    await onInput(
+      { source: "user", input: '<skill name="requesting-code-review" location="/path">\ncontent\n</skill>' },
+      ctx
+    );
+
+    // The gate should have fired because there are unresolved phases before "review"
+    expect(selectCalled).toBe(true);
+  });
+
   test("multiline input blocks when farther phase has unresolved predecessors", async () => {
     const state = createWorkflowState({}, null);
     const { fake, onSessionSwitch, onInput } = setupWithState(state);

@@ -121,9 +121,11 @@ export default function (pi: ExtensionAPI) {
     let furthestIdx = -1;
 
     for (const line of lines) {
-      const match = line.match(/^\s*\/skill:([^\s]+)/);
-      if (!match) continue;
-      const phase = skillToPhase[match[1]] ?? null;
+      const slashMatch = line.match(/^\s*\/skill:([^\s]+)/);
+      const xmlMatch = line.match(/<skill\s+name="([^"]+)"/);
+      const skill = slashMatch?.[1] ?? xmlMatch?.[1] ?? null;
+      if (!skill) continue;
+      const phase = skillToPhase[skill] ?? null;
       if (!phase) continue;
       const idx = WORKFLOW_PHASES.indexOf(phase);
       if (idx > furthestIdx) {
