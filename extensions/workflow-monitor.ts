@@ -420,8 +420,11 @@ export default function (pi: ExtensionAPI) {
       if (path) {
         const phase = workflowState?.currentPhase;
         const isThinkingPhase = phase === "brainstorm" || phase === "plan";
-        const normalizedPath = path.startsWith("./") ? path.slice(2) : path;
-        const isPlansWrite = normalizedPath.startsWith("docs/plans/");
+        let normalizedForCheck = path;
+        if (normalizedForCheck.startsWith("./")) normalizedForCheck = normalizedForCheck.slice(2);
+        // Absolute paths: check if they end with /docs/plans/...
+        const plansIdx = normalizedForCheck.indexOf("docs/plans/");
+        const isPlansWrite = plansIdx !== -1 && (plansIdx === 0 || normalizedForCheck[plansIdx - 1] === "/");
 
         if (isThinkingPhase && !isPlansWrite) {
           const escalation = await maybeEscalate("process", ctx);
@@ -436,7 +439,7 @@ export default function (pi: ExtensionAPI) {
           );
         }
 
-        changed = handler.handleFileWritten(normalizedPath) || changed;
+        changed = handler.handleFileWritten(path) || changed;
       }
 
       if (!branchConfirmed) {
