@@ -403,6 +403,9 @@ export default function (pi: ExtensionAPI) {
       const phase = workflowState?.currentPhase;
       const isThinkingPhase = phase === "brainstorm" || phase === "plan";
 
+      // During brainstorm/plan, practice escalation is intentionally skipped.
+      // Process violations already block non-plan writes in thinking phases,
+      // making practice escalation redundant and noisy.
       if (!isThinkingPhase) {
         const escalation = await maybeEscalate("practice", ctx);
         if (escalation === "block") {
