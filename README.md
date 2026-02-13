@@ -22,6 +22,10 @@ Your coding agent doesn't just know the rules - it follows them. Skills teach th
 
 The agent sees these warnings as part of its normal tool output - no configuration needed.
 
+More detail:
+- [`docs/oversight-model.md`](docs/oversight-model.md) — how skills + runtime enforcement work together, and how warnings escalate
+- [`docs/workflow-phases.md`](docs/workflow-phases.md) — what each workflow phase permits (especially thinking-phase write boundaries)
+
 ## Install
 
 ```bash
