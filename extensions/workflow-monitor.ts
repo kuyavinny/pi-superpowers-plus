@@ -13,19 +13,6 @@ import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Text } from "@mariozechner/pi-tui";
 import { createWorkflowHandler, type Violation } from "./workflow-monitor/workflow-handler";
-
-type SelectOption<T extends string> = { label: string; value: T };
-
-async function selectValue<T extends string>(
-  ctx: ExtensionContext,
-  title: string,
-  options: SelectOption<T>[]
-): Promise<T> {
-  const labels = options.map((o) => o.label);
-  const pickedLabel = await ctx.ui.select(title, labels);
-  const picked = options.find((o) => o.label === pickedLabel);
-  return (picked?.value ?? "cancel") as T;
-}
 import { type VerificationViolation } from "./workflow-monitor/verification-monitor";
 import { getTddViolationWarning } from "./workflow-monitor/warnings";
 import {
@@ -46,6 +33,19 @@ import {
 import { getTransitionPrompt } from "./workflow-monitor/workflow-transitions";
 import { getCurrentGitRef } from "./workflow-monitor/git";
 import { getUnresolvedPhasesBefore, getUnresolvedPhases } from "./workflow-monitor/skip-confirmation";
+
+type SelectOption<T extends string> = { label: string; value: T };
+
+async function selectValue<T extends string>(
+  ctx: ExtensionContext,
+  title: string,
+  options: SelectOption<T>[]
+): Promise<T> {
+  const labels = options.map((o) => o.label);
+  const pickedLabel = await ctx.ui.select(title, labels);
+  const picked = options.find((o) => o.label === pickedLabel);
+  return (picked?.value ?? "cancel") as T;
+}
 
 export default function (pi: ExtensionAPI) {
   const handler = createWorkflowHandler();
@@ -423,7 +423,8 @@ export default function (pi: ExtensionAPI) {
         const state = handler.getWorkflowState();
         const phase = state?.currentPhase;
         const isThinkingPhase = phase === "brainstorm" || phase === "plan";
-        const isPlansWrite = typeof path === "string" && path.startsWith("docs/plans/");
+        const normalizedPath = path.startsWith("./") ? path.slice(2) : path;
+        const isPlansWrite = normalizedPath.startsWith("docs/plans/");
 
         if (isThinkingPhase && !isPlansWrite) {
           const escalation = await maybeEscalate("process", ctx);
@@ -438,7 +439,7 @@ export default function (pi: ExtensionAPI) {
           );
         }
 
-        changed = handler.handleFileWritten(path) || changed;
+        changed = handler.handleFileWritten(normalizedPath) || changed;
       }
 
       if (!branchConfirmed) {
@@ -569,7 +570,7 @@ export default function (pi: ExtensionAPI) {
     const prompt = getTransitionPrompt(boundary, latestState.artifacts[boundaryPhase]);
 
     const options = prompt.options.map((o) => o.label);
-    const pickedLabel = await ctx.ui.select(prompt.title, options as any);
+    const pickedLabel = await ctx.ui.select(prompt.title, options);
 
     const selected = prompt.options.find((o) => o.label === pickedLabel)?.choice ?? null;
 
