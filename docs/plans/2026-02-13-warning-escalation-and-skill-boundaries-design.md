@@ -1,40 +1,121 @@
 # Warning Escalation & Skill Boundary Enforcement
 
-**Date:** 2026-02-13
+**Date:** 2026-02-13  
 **Status:** Design
 
 ## Problem
 
 The workflow monitor injects warnings into tool results when the agent violates guardrails (TDD, branch safety, phase skipping). However, agents can and do ignore these warnings entirely — editing code repeatedly despite multiple ⚠️ messages. The skills themselves also lack explicit boundaries about what actions are in/out of scope for each phase.
 
+Additionally, several existing enforcement mechanisms are broken or incomplete:
+- `ui.select` prompts display `[object Object]` instead of readable choices
+- The verify gate fires on `git commit` even during brainstorming (e.g., committing a design doc)
+- No distinction between writing docs and writing code during thinking phases
+
+---
+
+## How Skills and Oversight Work Together
+
+The enforcement model has two layers: **skills** guide the agent's behavior, and the **workflow monitor extension** catches violations when the agent ignores that guidance. They serve different purposes and reinforce each other.
+
+### Layer 1: Skills (Agent Self-Governance)
+
+Skills are markdown instructions loaded on-demand when the agent enters a workflow phase. They define what the agent *should* do — and critically, what it should *not* do. Each skill contains:
+
+- **Purpose and process** — what the phase is for, step-by-step instructions
+- **Boundaries** — what actions are in/out of scope for this phase
+- **Warning respect** — instructions to stop if a workflow warning appears in tool output
+
+Skills are the primary guardrail. A well-written skill prevents most violations before they happen, because the agent follows the instructions. The goal is that the extension rarely needs to intervene.
+
+### Layer 2: Workflow Monitor Extension (Safety Net)
+
+The extension runs continuously, observing every tool call and result. It does NOT rely on the agent reading or following skill instructions. It independently enforces rules by:
+
+1. **Detecting violations** — inspecting file paths, tool names, git commands, and workflow phase state
+2. **Injecting warnings** — appending ⚠️ messages to tool results so the agent sees them
+3. **Escalating to hard blocks** — on repeated violations, preventing the action entirely and prompting the user
+
+The extension is the backstop. It catches the cases where the agent ignores, misinterprets, or never loaded the relevant skill.
+
+### How They Interact
+
+```
+Agent receives task
+    │
+    ▼
+Skill loaded ──────────────────── Skill says: "Don't edit code in this phase"
+    │
+    ▼
+Agent follows skill ─── ✅ ────── No violation. Extension stays silent.
+    │
+    ▼
+Agent ignores skill ─── ⚠️ ────── Extension detects violation, injects warning.
+    │                              Agent sees warning in tool result.
+    │
+    ▼
+Agent heeds warning ─── ✅ ────── Agent self-corrects. Count stays at 1.
+    │
+    ▼
+Agent ignores warning ── 🛑 ───── Extension hard-blocks the action.
+                                   User prompted: allow or stop?
+```
+
+This creates defense in depth:
+- **Most of the time**, the skill prevents the violation entirely (the agent never tries)
+- **Occasionally**, the agent slips and the warning redirects it
+- **Rarely**, the agent ignores everything and the hard block protects the user
+
+The user always has final say. A hard block can be overridden — the system trusts the human, not the agent.
+
+---
+
 ## Design
 
-### 1. Skill Boundaries — "Thinking" Phase Skills
+### 1. Phase-Aware File Write Enforcement
 
-Add a short **Boundaries** section to skills where the agent should NOT be editing source code:
+The extension must distinguish between legitimate file writes and violations based on the current workflow phase.
 
-- **brainstorming** 
-- **writing-plans**
-- **verification-before-completion** (reads/runs commands, doesn't edit)
+**During brainstorm and plan phases**, the only permitted file writes are to `docs/plans/`. Any other file write — source code, test files, config — is a process violation.
 
-Content (adapt per skill):
+| Current Phase | File Path | Result |
+|---------------|-----------|--------|
+| brainstorm | `docs/plans/*.md` | ✅ Allowed |
+| brainstorm | `extensions/foo.ts` | ❌ Process violation |
+| brainstorm | `tests/foo.test.ts` | ❌ Process violation |
+| plan | `docs/plans/*.md` | ✅ Allowed |
+| plan | `src/bar.ts` | ❌ Process violation |
+| execute+ | any | Governed by TDD/practice rules |
+
+**Verify gate on `git commit`** only fires when the workflow has reached or passed the `execute` phase. Committing a design doc during brainstorming does not trigger the verify check.
+
+### 2. Skill Boundaries — "Thinking" Phase Skills
+
+Add a concise **Boundaries** section to skills where the agent should not be writing code:
+
+**brainstorming, writing-plans:**
 
 ```
 ## Boundaries
-- Reading code and docs: yes
-- Writing design/plan docs: yes
-- Editing or creating source code: no
+- Read code and docs: yes
+- Write to docs/plans/: yes
+- Edit or create any other files: no
 ```
 
-### 2. Skill Prerequisites — "Doing" Phase Skills
+**verification-before-completion:**
 
-Add a **Prerequisites** note to skills where implementation happens:
+```
+## Boundaries
+- Run verification commands: yes
+- Read code and output: yes
+- Edit source code: no
+```
 
-- **test-driven-development**
-- **executing-plans**
-- **subagent-driven-development**
+### 3. Skill Prerequisites — "Doing" Phase Skills
 
-Content (adapt per skill):
+Add a **Prerequisites** note to implementation skills:
+
+**test-driven-development, executing-plans, subagent-driven-development:**
 
 ```
 ## Prerequisites
@@ -42,68 +123,62 @@ Content (adapt per skill):
 - Approved plan or clear task scope
 ```
 
-### 3. Warning Respect Line — "Doing" Phase Skills Only
+### 4. Warning Respect — "Doing" Phase Skills Only
 
-Add one line to all doing-phase skills:
+Add one line to skills where the agent is actively coding and may encounter warnings:
 
-- **test-driven-development**
-- **executing-plans**
-- **subagent-driven-development**
-- **systematic-debugging**
-- **verification-before-completion**
-
-Content:
+**test-driven-development, executing-plans, subagent-driven-development, systematic-debugging, verification-before-completion:**
 
 ```
 If a tool result contains a ⚠️ workflow warning, stop immediately and address it before continuing.
 ```
 
-This line is NOT needed on thinking-phase skills (brainstorming, writing-plans) because their boundaries already prevent the actions that trigger warnings.
+This line is not needed on thinking-phase skills because their boundaries already prevent the actions that trigger warnings.
 
-### 4. Extension Escalation — Two-Bucket Strike Counter (Option C)
+### 5. Extension Escalation — Two-Bucket Strike Counter
 
 #### Violation Categories
 
-**Process violations** (you skipped the workflow):
-- Wrong phase (e.g., editing code during brainstorming)
-- No branch (writing to main without confirmation)
-- No plan (jumping to implementation without a plan)
+**Process violations** — the agent skipped the workflow:
+- Writing files outside `docs/plans/` during brainstorm or plan phase
+- Writing to main branch without confirmation
+- Jumping to implementation without a plan
 
-**Practice violations** (you're coding wrong):
-- TDD violation (production code before/without failing test)
+**Practice violations** — the agent is coding incorrectly:
+- TDD violation (production code before a failing test)
 - Debug violation (guessing fixes without investigation)
-- Verification violation (claiming success without running checks)
+- Verification violation (claiming success without evidence)
 
 #### Escalation Behavior
 
-1. **First violation in a bucket:** Soft warning injected into tool result (current behavior). Counter for that bucket increments to 1.
+**First violation in a bucket:** Soft warning injected into tool result (current behavior). The action still succeeds. Counter increments to 1.
 
-2. **Second violation in same bucket:** Hard block. The edit/write is prevented. A `ui.select` prompt is shown to the user:
-   - Prompt: "Agent has repeatedly violated [process/practice] guardrails: [list violations]. Allow it to continue?"
-   - **Yes, continue** — counter resets for that bucket, agent proceeds
-   - **No, stop** — action stays blocked
+**Second violation in same bucket:** Hard block. The action is prevented. A `ui.select` prompt is shown to the user:
+
+> "The agent has repeatedly violated [process/practice] guardrails. Allow it to continue?"
+> - Yes, continue
+> - No, stop
+
+If the user selects "Yes, continue," the counter resets and the agent proceeds. If "No, stop," the action stays blocked.
 
 #### Counter Scope
 
-- Counters are **per-session** (reset on session switch)
-- Each bucket (process, practice) has its own independent counter
-- User override (selecting "Yes, continue") resets that bucket's counter
+- Counters are **per-session** (reset on new session)
+- Each bucket (process, practice) is tracked independently
+- User override resets that bucket's counter only
 
-#### Implementation Notes
+### 6. Fix ui.select Bug
 
-- The `onToolResult` hook already injects warnings — extend it to track counts
-- On second strike, return `{ blocked: true }` instead of just appending warning text
-- The `ui.select` prompt uses plain string arrays (not objects) per the API: `ctx.ui.select("...", ["Yes, continue", "No, stop"])`
-- Store counters in the extension's in-memory state (no persistence needed — session-scoped)
+All current `ui.select` calls pass `{ label, value }` objects instead of plain strings, causing `[object Object]` to render as choices. The pi API expects `ctx.ui.select("prompt", ["Option A", "Option B"])` and returns the selected string.
 
-### 5. Fix Existing ui.select Bug
+Fix all 7 call sites in `workflow-monitor.ts` to pass string arrays and map the returned label string back to the intended action value.
 
-All current `ui.select` calls pass `{ label, value }` objects instead of plain strings, causing `[object Object]` to display as choices. Fix all 7 call sites in `workflow-monitor.ts` to pass string arrays and map the returned label back to the intended value.
+---
 
 ## Skills Affected
 
-| Skill | Change |
-|-------|--------|
+| Skill | Changes |
+|-------|---------|
 | brainstorming | Add Boundaries section |
 | writing-plans | Add Boundaries section |
 | verification-before-completion | Add Boundaries section + warning respect line |
@@ -119,6 +194,6 @@ All current `ui.select` calls pass `{ label, value }` objects instead of plain s
 
 ## Out of Scope
 
-- Shared skill includes (pi doesn't support them — each skill is self-contained)
+- Shared skill includes (pi skills are self-contained; each gets its own copy of boundary text)
 - Cross-session violation tracking (counters reset per session)
-- Changing the workflow phase model itself
+- Changes to the workflow phase model itself
