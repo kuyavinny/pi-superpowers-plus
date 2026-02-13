@@ -17,6 +17,8 @@ Your coding agent doesn't just know the rules - it follows them. Skills teach th
 **After installation**:
 - Any time the agent writes a source file without a failing test, it gets a warning injected into the tool result.
 - Any time it tries to `git commit` / `git push` / `gh pr create` without passing tests, it gets gated.
+- During **Brainstorm**/**Plan**, writes are restricted to `docs/plans/` (writes elsewhere trigger a process violation).
+- Repeated violations **escalate**: skill boundary → soft warning → hard block (interactive) → explicit user override.
 - On the first tool output of a session (inside a git repo), the agent is shown the **current git branch (or detached HEAD short SHA)**.
 - On the first write/edit of a session (inside a git repo), the agent is warned to **confirm it's on the correct branch/worktree** before continuing.
 
