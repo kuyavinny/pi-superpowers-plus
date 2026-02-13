@@ -100,6 +100,36 @@ async function setupExtension(state: WorkflowTrackerState) {
 }
 
 describe("completion-action gating on bash commands", () => {
+  test("commit during brainstorm does not prompt completion gate", async () => {
+    const state = createWorkflowState(
+      {
+        brainstorm: "active",
+        plan: "pending",
+        execute: "pending",
+        verify: "pending",
+        review: "pending",
+        finish: "pending",
+      },
+      "brainstorm"
+    );
+
+    const { onSessionSwitch, onToolCall } = await setupExtension(state);
+    const { ctx } = createCtx(state, true, ["Do verify now"]);
+
+    await onSessionSwitch({}, ctx);
+
+    await onToolCall(
+      {
+        toolCallId: "tc1",
+        toolName: "bash",
+        input: { command: "git commit -m 'docs: brainstorm'" },
+      },
+      ctx
+    );
+
+    expect(ctx.ui.select).not.toHaveBeenCalled();
+  });
+
   test("interactive commit with unresolved verify -> Do now blocks + editor set to /skill:verification-before-completion", async () => {
     const state = createWorkflowState(
       {

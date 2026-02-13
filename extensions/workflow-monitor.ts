@@ -367,31 +367,26 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName === "bash") {
       const command = ((event.input as Record<string, any>).command as string | undefined) ?? "";
 
-      // Completion action gating (interactive only)
-      if (ctx.hasUI) {
+      const state = handler.getWorkflowState();
+      const phaseIdx = state?.currentPhase ? WORKFLOW_PHASES.indexOf(state.currentPhase) : -1;
+      const executeIdx = WORKFLOW_PHASES.indexOf("execute");
+
+      // Completion action gating (interactive only, execute+ phases)
+      if (ctx.hasUI && state && phaseIdx >= executeIdx) {
         const actionTarget = getCompletionActionTarget(command);
         if (actionTarget) {
-          const currentState = handler.getWorkflowState();
-          if (currentState) {
-            const unresolved = getUnresolvedPhasesForAction(actionTarget, currentState);
-            if (unresolved.length > 0) {
-              const gateResult = await promptCompletionGate(unresolved, ctx);
-              if (gateResult === "blocked") {
-                return { blocked: true };
-              }
-              // If allowed (skipped), record waiver if verify was among skipped
-              // so verification warning isn't re-flagged
-              if (unresolved.includes("verify")) {
-                handler.recordVerificationWaiver();
-              }
+          const unresolved = getUnresolvedPhasesForAction(actionTarget, state);
+          if (unresolved.length > 0) {
+            const gateResult = await promptCompletionGate(unresolved, ctx);
+            if (gateResult === "blocked") {
+              return { blocked: true };
+            }
+            if (unresolved.includes("verify")) {
+              handler.recordVerificationWaiver();
             }
           }
         }
       }
-
-      const state = handler.getWorkflowState();
-      const phaseIdx = state?.currentPhase ? WORKFLOW_PHASES.indexOf(state.currentPhase) : -1;
-      const executeIdx = WORKFLOW_PHASES.indexOf("execute");
 
       if (phaseIdx >= executeIdx) {
         const verificationViolation = handler.checkCommitGate(command);
