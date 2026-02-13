@@ -161,7 +161,10 @@ export default function (pi: ExtensionAPI) {
   // --- Input observation (skill detection + skip-confirmation gate) ---
   pi.on("input", async (event, ctx) => {
     if (event.source === "extension") return;
-    const text = (event.input as string | undefined) ?? "";
+    const text =
+      (event.text as string | undefined) ??
+      (event.input as string | undefined) ??
+      "";
 
     const targetPhase = parseTargetPhase(text);
 

@@ -73,7 +73,7 @@ describe("boundary prompting", () => {
       },
     };
 
-    await onInput({ source: "user", input: "/skill:writing-plans" }, ctx);
+    await onInput({ source: "user", text: "/skill:writing-plans" }, ctx);
     inAgentEnd = true;
     await onAgentEnd({}, ctx);
 
@@ -318,7 +318,7 @@ describe("boundary prompting", () => {
       },
     };
 
-    await onInput({ source: "user", input: "/skill:verification-before-completion" }, ctx);
+    await onInput({ source: "user", text: "/skill:verification-before-completion" }, ctx);
 
     inAgentEnd = true;
     await onAgentEnd({}, ctx);

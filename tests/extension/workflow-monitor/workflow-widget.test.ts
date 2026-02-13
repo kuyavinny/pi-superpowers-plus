@@ -46,7 +46,7 @@ describe("workflow monitor widget", () => {
     };
 
     const onInput = getSingleHandler(fake.handlers, "input");
-    await onInput({ source: "user", input: "/skill:writing-plans" }, ctx);
+    await onInput({ source: "user", text: "/skill:writing-plans" }, ctx);
 
     expect(renderer).toBeTypeOf("function");
 
