@@ -40,4 +40,52 @@ describe("tdd-guard", () => {
 
     expect(res).toEqual({ blocked: true });
   });
+
+  test("failing test command does not unlock production writes", async () => {
+    const fake = createFakePi();
+    tddGuardExtension(fake.api as any);
+
+    const onToolCall = getSingleHandler(fake.handlers, "tool_call");
+    const onToolResult = getSingleHandler(fake.handlers, "tool_result");
+
+    await onToolCall(
+      { toolCallId: "t1", toolName: "bash", input: { command: "npm test" } },
+      { hasUI: false }
+    );
+    await onToolResult(
+      { toolCallId: "t1", toolName: "bash", input: { command: "npm test" }, details: { exitCode: 1 } },
+      { hasUI: false }
+    );
+
+    const res = await onToolCall(
+      { toolCallId: "w1", toolName: "write", input: { path: "src/x.ts", content: "export const x = 1" } },
+      { hasUI: false }
+    );
+
+    expect(res).toEqual({ blocked: true });
+  });
+
+  test("passing test command unlocks production writes", async () => {
+    const fake = createFakePi();
+    tddGuardExtension(fake.api as any);
+
+    const onToolCall = getSingleHandler(fake.handlers, "tool_call");
+    const onToolResult = getSingleHandler(fake.handlers, "tool_result");
+
+    await onToolCall(
+      { toolCallId: "t1", toolName: "bash", input: { command: "npm test" } },
+      { hasUI: false }
+    );
+    await onToolResult(
+      { toolCallId: "t1", toolName: "bash", input: { command: "npm test" }, details: { exitCode: 0 } },
+      { hasUI: false }
+    );
+
+    const res = await onToolCall(
+      { toolCallId: "w1", toolName: "write", input: { path: "src/x.ts", content: "export const x = 1" } },
+      { hasUI: false }
+    );
+
+    expect(res).toBeUndefined();
+  });
 });

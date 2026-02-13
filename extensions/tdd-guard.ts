@@ -24,6 +24,7 @@ function isTestCommand(cmd: string): boolean {
 export default function (pi: ExtensionAPI) {
   let hasRunTests = false;
   let consecutiveBlockedWrites = 0;
+  const pendingTestCommands = new Set<string>();
   const violationsFile = process.env.PI_TDD_GUARD_VIOLATIONS_FILE;
   let violations = 0;
 
@@ -39,9 +40,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event) => {
     if (event.toolName === "bash") {
       const command = (event.input as any)?.command as string | undefined;
-      if (command && isTestCommand(command)) {
-        hasRunTests = true;
-        consecutiveBlockedWrites = 0;
+      if (command && isTestCommand(command) && event.toolCallId) {
+        pendingTestCommands.add(event.toolCallId);
       }
       return;
     }
@@ -62,6 +62,20 @@ export default function (pi: ExtensionAPI) {
         return { blocked: true };
       }
 
+      consecutiveBlockedWrites = 0;
+    }
+  });
+
+  pi.on("tool_result", async (event) => {
+    if (event.toolName !== "bash") return;
+    if (!event.toolCallId || !pendingTestCommands.has(event.toolCallId)) return;
+
+    pendingTestCommands.delete(event.toolCallId);
+    const exitCode = (event.details as any)?.exitCode;
+    const passed = typeof exitCode === "number" ? exitCode === 0 : event.isError !== true;
+
+    if (passed) {
+      hasRunTests = true;
       consecutiveBlockedWrites = 0;
     }
   });
