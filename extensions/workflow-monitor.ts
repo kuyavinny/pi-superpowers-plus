@@ -356,9 +356,15 @@ export default function (pi: ExtensionAPI) {
         }
       }
 
-      const verificationViolation = handler.checkCommitGate(command);
-      if (verificationViolation) {
-        pendingVerificationViolations.set(toolCallId, verificationViolation);
+      const state = handler.getWorkflowState();
+      const phaseIdx = state?.currentPhase ? WORKFLOW_PHASES.indexOf(state.currentPhase) : -1;
+      const executeIdx = WORKFLOW_PHASES.indexOf("execute");
+
+      if (phaseIdx >= executeIdx) {
+        const verificationViolation = handler.checkCommitGate(command);
+        if (verificationViolation) {
+          pendingVerificationViolations.set(toolCallId, verificationViolation);
+        }
       }
     }
 
