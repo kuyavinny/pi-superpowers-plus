@@ -401,6 +401,17 @@ export default function (pi: ExtensionAPI) {
     const input = event.input as Record<string, any>;
     const result = handler.handleToolCall(event.toolName, input);
     if (result.violation) {
+      const state = handler.getWorkflowState();
+      const phase = state?.currentPhase;
+      const isThinkingPhase = phase === "brainstorm" || phase === "plan";
+
+      if (!isThinkingPhase) {
+        const escalation = await maybeEscalate("practice", ctx);
+        if (escalation === "block") {
+          return { blocked: true };
+        }
+      }
+
       pendingViolations.set(toolCallId, result.violation);
     }
 
