@@ -113,7 +113,7 @@ describe("completion-action gating on bash commands", () => {
       "execute"
     );
     const { fake, onSessionSwitch, onToolCall } = await setupExtension(state);
-    const { ctx, editorTexts } = createCtx(state, true, ["do_now"]);
+    const { ctx, editorTexts } = createCtx(state, true, ["Do verify now"]);
 
     await onSessionSwitch({}, ctx);
 
@@ -146,7 +146,7 @@ describe("completion-action gating on bash commands", () => {
       "execute"
     );
     const { fake, onSessionSwitch, onToolCall, onToolResult } = await setupExtension(state);
-    const { ctx } = createCtx(state, true, ["skip"]);
+    const { ctx } = createCtx(state, true, ["Skip verify"]);
 
     await onSessionSwitch({}, ctx);
 
@@ -201,7 +201,7 @@ describe("completion-action gating on bash commands", () => {
       "execute"
     );
     const { fake, onSessionSwitch, onToolCall } = await setupExtension(state);
-    const { ctx } = createCtx(state, true, ["skip_all"]);
+    const { ctx } = createCtx(state, true, ["Skip all and continue"]);
 
     await onSessionSwitch({}, ctx);
 
@@ -234,7 +234,7 @@ describe("completion-action gating on bash commands", () => {
       "execute"
     );
     const { fake, onSessionSwitch, onToolCall } = await setupExtension(state);
-    const { ctx } = createCtx(state, true, ["cancel"]);
+    const { ctx } = createCtx(state, true, ["Cancel"]);
 
     await onSessionSwitch({}, ctx);
 
@@ -356,5 +356,34 @@ describe("completion-action gating on bash commands", () => {
 
     expect(ctx.ui.select).not.toHaveBeenCalled();
     expect(result?.blocked).not.toBe(true);
+  });
+
+  test("completion gate prompts with string labels (not objects)", async () => {
+    const state = createWorkflowState(
+      {
+        brainstorm: "complete",
+        plan: "complete",
+        execute: "complete",
+        verify: "pending",
+        review: "pending",
+        finish: "pending",
+      },
+      "execute"
+    );
+
+    const { onSessionSwitch, onToolCall } = await setupExtension(state);
+
+    const { ctx } = createCtx(state, true, ["Skip verify"]);
+
+    await onSessionSwitch({}, ctx);
+
+    await onToolCall(
+      { toolCallId: "tc1", toolName: "bash", input: { command: "git commit -m 'x'" } },
+      ctx
+    );
+
+    expect(ctx.ui.select).toHaveBeenCalledTimes(1);
+    const [_title, options] = (ctx.ui.select as any).mock.calls[0];
+    expect(options).toEqual(["Do verify now", "Skip verify", "Cancel"]);
   });
 });

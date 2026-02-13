@@ -245,15 +245,11 @@ export default function (pi: ExtensionAPI) {
       const missing = unresolved[0];
       const missingSkill = phaseToSkill[missing] ?? missing;
       const options = [
-        { label: `Do ${missing} now`, value: "do_now" },
-        { label: `Skip ${missing}`, value: "skip" },
-        { label: "Cancel", value: "cancel" },
+        { label: `Do ${missing} now`, value: "do_now" as const },
+        { label: `Skip ${missing}`, value: "skip" as const },
+        { label: "Cancel", value: "cancel" as const },
       ];
-      const result = await ctx.ui.select(
-        `Phase "${missing}" is unresolved. What would you like to do?`,
-        options as any
-      );
-      const choice = typeof result === "string" ? result : (result as any)?.value ?? "cancel";
+      const choice = await selectValue(ctx, `Phase "${missing}" is unresolved. What would you like to do?`, options);
 
       if (choice === "skip") {
         handler.skipWorkflowPhases([missing]);
@@ -270,18 +266,11 @@ export default function (pi: ExtensionAPI) {
 
     // Multiple unresolved
     const summaryOptions = [
-      { label: "Review one-by-one", value: "review_individually" },
-      { label: "Skip all and continue", value: "skip_all" },
-      { label: "Cancel", value: "cancel" },
+      { label: "Review one-by-one", value: "review_individually" as const },
+      { label: "Skip all and continue", value: "skip_all" as const },
+      { label: "Cancel", value: "cancel" as const },
     ];
-    const summaryResult = await ctx.ui.select(
-      `${unresolved.length} phases are unresolved: ${unresolved.join(", ")}. What would you like to do?`,
-      summaryOptions as any
-    );
-    const summaryChoice =
-      typeof summaryResult === "string"
-        ? summaryResult
-        : (summaryResult as any)?.value ?? "cancel";
+    const summaryChoice = await selectValue(ctx, `${unresolved.length} phases are unresolved: ${unresolved.join(", ")}. What would you like to do?`, summaryOptions);
 
     if (summaryChoice === "skip_all") {
       handler.skipWorkflowPhases(unresolved);
@@ -296,15 +285,11 @@ export default function (pi: ExtensionAPI) {
     for (const phase of unresolved) {
       const skill = phaseToSkill[phase] ?? phase;
       const options = [
-        { label: `Do ${phase} now`, value: "do_now" },
-        { label: `Skip ${phase}`, value: "skip" },
-        { label: "Cancel", value: "cancel" },
+        { label: `Do ${phase} now`, value: "do_now" as const },
+        { label: `Skip ${phase}`, value: "skip" as const },
+        { label: "Cancel", value: "cancel" as const },
       ];
-      const result = await ctx.ui.select(
-        `Phase "${phase}" is unresolved. What would you like to do?`,
-        options as any
-      );
-      const choice = typeof result === "string" ? result : (result as any)?.value ?? "cancel";
+      const choice = await selectValue(ctx, `Phase "${phase}" is unresolved. What would you like to do?`, options);
 
       if (choice === "skip") {
         handler.skipWorkflowPhases([phase]);
