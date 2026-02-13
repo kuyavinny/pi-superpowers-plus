@@ -127,6 +127,39 @@ describe("skip-confirmation gating on /skill transitions", () => {
     expect(ctx.ui.select).not.toHaveBeenCalled();
   });
 
+  test("skip-confirmation prompts with string labels (not {label,value} objects)", async () => {
+    const { onSessionSwitch, onInput } = setupWithState(
+      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm")
+    );
+
+    const ctx = {
+      hasUI: true,
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "custom",
+            customType: WORKFLOW_TRACKER_ENTRY_TYPE,
+            data: createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm"),
+          },
+        ],
+      },
+      ui: {
+        setWidget: () => {},
+        select: vi.fn().mockResolvedValue("Skip plan"),
+        setEditorText: vi.fn(),
+        notify: () => {},
+      },
+    };
+
+    await onSessionSwitch({}, ctx);
+    await onInput({ source: "user", input: "/skill:executing-plans" }, ctx);
+
+    expect(ctx.ui.select).toHaveBeenCalledTimes(1);
+    const [_title, options] = (ctx.ui.select as any).mock.calls[0];
+    expect(Array.isArray(options)).toBe(true);
+    expect(options).toEqual(["Do plan now", "Skip plan", "Cancel"]);
+  });
+
   test("single unresolved + skip: skips phase and allows transition", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
       createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm")
@@ -146,7 +179,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
       },
       ui: {
         setWidget: () => {},
-        select: vi.fn().mockResolvedValue("skip"),
+        select: vi.fn().mockResolvedValue("Skip plan"),
         setEditorText: (text: string) => editorTexts.push(text),
         notify: () => {},
       },
@@ -184,7 +217,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
       },
       ui: {
         setWidget: () => {},
-        select: vi.fn().mockResolvedValue("do_now"),
+        select: vi.fn().mockResolvedValue("Do plan now"),
         setEditorText: (text: string) => editorTexts.push(text),
         notify: () => {},
       },
@@ -224,7 +257,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
       },
       ui: {
         setWidget: () => {},
-        select: vi.fn().mockResolvedValue("cancel"),
+        select: vi.fn().mockResolvedValue("Cancel"),
         setEditorText: vi.fn(),
         notify: () => {},
       },
@@ -263,7 +296,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
       },
       ui: {
         setWidget: () => {},
-        select: vi.fn().mockResolvedValue("skip_all"),
+        select: vi.fn().mockResolvedValue("Skip all and continue"),
         setEditorText: vi.fn(),
         notify: () => {},
       },
@@ -304,7 +337,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
       },
       ui: {
         setWidget: () => {},
-        select: vi.fn().mockResolvedValue("cancel"),
+        select: vi.fn().mockResolvedValue("Cancel"),
         setEditorText: vi.fn(),
         notify: () => {},
       },
@@ -325,8 +358,8 @@ describe("skip-confirmation gating on /skill transitions", () => {
       )
     );
 
-    // First select: review_individually, then skip brainstorm, then skip plan
-    const selectResponses = ["review_individually", "skip", "skip"];
+    // First select: Review one-by-one, then Skip brainstorm, then Skip plan
+    const selectResponses = ["Review one-by-one", "Skip brainstorm", "Skip plan"];
     let selectIdx = 0;
 
     const ctx = {
@@ -372,7 +405,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
     );
 
     const editorTexts: string[] = [];
-    const selectResponses = ["review_individually", "do_now"];
+    const selectResponses = ["Review one-by-one", "Do brainstorm now"];
     let selectIdx = 0;
 
     const ctx = {
@@ -456,7 +489,7 @@ describe("multiline /skill input: gate applies to furthest target phase", () => 
       },
       ui: {
         setWidget: () => {},
-        select: vi.fn().mockResolvedValue("skip_all"),
+        select: vi.fn().mockResolvedValue("Skip all and continue"),
         setEditorText: vi.fn(),
         notify: () => {},
       },
@@ -555,7 +588,7 @@ describe("multiline /skill input: gate applies to furthest target phase", () => 
       },
       ui: {
         setWidget: () => {},
-        select: vi.fn().mockResolvedValue("cancel"),
+        select: vi.fn().mockResolvedValue("Cancel"),
         setEditorText: vi.fn(),
         notify: () => {},
       },
