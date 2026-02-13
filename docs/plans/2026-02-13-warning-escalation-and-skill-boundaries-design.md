@@ -192,6 +192,31 @@ Fix all 7 call sites in `workflow-monitor.ts` to pass string arrays and map the 
 | requesting-code-review | No change |
 | using-git-worktrees | No change |
 
+## Documentation Updates
+
+The oversight model is a core part of this project's value proposition and needs to be clearly documented for users.
+
+### README.md
+
+Update the README to reflect the two-layer enforcement model. The current "What You Get" section describes warnings and gates but doesn't explain the skill boundary system or the escalation behavior. Add:
+
+- A brief explanation of how skills and the extension work together (the defense-in-depth concept)
+- The escalation path: skill boundaries → soft warning → hard block → user override
+- Phase-aware enforcement: thinking phases restrict file writes to `docs/plans/`
+
+### docs/ (new)
+
+Create user-facing documentation outside of `docs/plans/` to explain the oversight system in detail. Candidates:
+
+- `docs/oversight-model.md` — full explanation of the two-layer system, violation categories, escalation behavior, and how the user interacts with hard blocks
+- `docs/workflow-phases.md` — what each phase permits, what gates exist, how phases transition (currently only captured implicitly in code and scattered across plan files)
+
+These docs should be written for someone installing the package and wanting to understand what it enforces and why — not implementation notes for contributors.
+
+### Sequencing
+
+Documentation updates should happen **after** implementation is complete, not during. The implementation may surface edge cases or design adjustments that would require rewriting docs. Write the docs once, against the final behavior.
+
 ## Out of Scope
 
 - Shared skill includes (pi skills are self-contained; each gets its own copy of boundary text)
