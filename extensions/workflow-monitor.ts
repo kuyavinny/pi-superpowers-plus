@@ -360,6 +360,7 @@ export default function (pi: ExtensionAPI) {
   // --- Tool call observation (detect file writes + verification gate) ---
   pi.on("tool_call", async (event, ctx) => {
     const toolCallId = event.toolCallId;
+    const workflowState = handler.getWorkflowState();
 
     if (event.toolName === "bash") {
       const command = ((event.input as Record<string, any>).command as string | undefined) ?? "";
@@ -368,9 +369,8 @@ export default function (pi: ExtensionAPI) {
       if (ctx.hasUI) {
         const actionTarget = getCompletionActionTarget(command);
         if (actionTarget) {
-          const currentState = handler.getWorkflowState();
-          if (currentState) {
-            const unresolved = getUnresolvedPhasesForAction(actionTarget, currentState);
+          if (workflowState) {
+            const unresolved = getUnresolvedPhasesForAction(actionTarget, workflowState);
             if (unresolved.length > 0) {
               const gateResult = await promptCompletionGate(unresolved, ctx);
               if (gateResult === "blocked") {
@@ -386,8 +386,7 @@ export default function (pi: ExtensionAPI) {
         }
       }
 
-      const state = handler.getWorkflowState();
-      const phaseIdx = state?.currentPhase ? WORKFLOW_PHASES.indexOf(state.currentPhase) : -1;
+      const phaseIdx = workflowState?.currentPhase ? WORKFLOW_PHASES.indexOf(workflowState.currentPhase) : -1;
       const executeIdx = WORKFLOW_PHASES.indexOf("execute");
 
       if (phaseIdx >= executeIdx) {
@@ -401,8 +400,7 @@ export default function (pi: ExtensionAPI) {
     const input = event.input as Record<string, any>;
     const result = handler.handleToolCall(event.toolName, input);
     if (result.violation) {
-      const state = handler.getWorkflowState();
-      const phase = state?.currentPhase;
+      const phase = workflowState?.currentPhase;
       const isThinkingPhase = phase === "brainstorm" || phase === "plan";
 
       if (!isThinkingPhase) {
@@ -420,8 +418,7 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName === "write" || event.toolName === "edit") {
       const path = input.path as string | undefined;
       if (path) {
-        const state = handler.getWorkflowState();
-        const phase = state?.currentPhase;
+        const phase = workflowState?.currentPhase;
         const isThinkingPhase = phase === "brainstorm" || phase === "plan";
         const normalizedPath = path.startsWith("./") ? path.slice(2) : path;
         const isPlansWrite = normalizedPath.startsWith("docs/plans/");
