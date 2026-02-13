@@ -17,6 +17,12 @@ Write the test first. Watch it fail. Write minimal code to pass.
 
 **Active enforcement:** The workflow monitor extension tracks your TDD phase (RED→GREEN→REFACTOR) and will warn if you write production code without a failing test. Use `workflow_reference` to look up rationalizations, examples, and anti-patterns on demand.
 
+If a tool result contains a ⚠️ workflow warning, stop immediately and address it before continuing.
+
+## Prerequisites
+- Active branch (not main) or user-confirmed intent to work on main
+- Approved plan or clear task scope
+
 ## When to Use
 
 **Always:** New features, bug fixes, refactoring, behavior changes.

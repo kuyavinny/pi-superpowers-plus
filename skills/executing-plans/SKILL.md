@@ -15,6 +15,12 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 
 **Announce at start:** "I'm using the executing-plans skill to implement this plan."
 
+If a tool result contains a ⚠️ workflow warning, stop immediately and address it before continuing.
+
+## Prerequisites
+- Active branch (not main) or user-confirmed intent to work on main
+- Approved plan or clear task scope
+
 ## The Process
 
 ### Step 1: Load and Review Plan

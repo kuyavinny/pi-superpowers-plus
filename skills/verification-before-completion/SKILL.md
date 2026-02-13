@@ -15,6 +15,13 @@ Claiming work is complete without verification is dishonesty, not efficiency.
 
 **Violating the letter of this rule is violating the spirit of this rule.**
 
+If a tool result contains a ⚠️ workflow warning, stop immediately and address it before continuing.
+
+## Boundaries
+- Run verification commands: yes
+- Read code and output: yes
+- Edit source code: no
+
 ## The Iron Law
 
 ```

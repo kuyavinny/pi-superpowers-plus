@@ -17,6 +17,8 @@ Random fixes waste time and create new bugs. Quick patches mask underlying issue
 
 > The workflow-monitor extension actively tracks your debugging: it detects fix-without-investigation and counts failed fix attempts. Use `workflow_reference` with debug topics for detailed guidance.
 
+If a tool result contains a ⚠️ workflow warning, stop immediately and address it before continuing.
+
 ## The Iron Law
 
 ```
