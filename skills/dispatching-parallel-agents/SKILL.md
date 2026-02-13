@@ -66,15 +66,17 @@ Each agent gets:
 ### 3. Dispatch in Parallel
 
 **How to dispatch:**
-- If a dispatch tool is available (e.g. pi-superteam's `team` tool), use it
-- Otherwise, run a second pi instance per task: `pi -p "prompt"`
-- For parallel tasks, use multiple terminal panes (one per task)
 
-```
-Agent 1: "Fix agent-tool-abort.test.ts failures"
-Agent 2: "Fix batch-completion-behavior.test.ts failures"
-Agent 3: "Fix tool-approval-race-conditions.test.ts failures"
-// All three run concurrently
+Use the `subagent` tool in parallel mode:
+
+```ts
+subagent({
+  tasks: [
+    { agent: "worker", task: "Fix agent-tool-abort.test.ts failures" },
+    { agent: "worker", task: "Fix batch-completion-behavior.test.ts failures" },
+    { agent: "worker", task: "Fix tool-approval-race-conditions.test.ts failures" },
+  ],
+})
 ```
 
 ### 4. Review and Integrate
@@ -149,11 +151,15 @@ Return: Summary of what you found and what you fixed.
 
 **Decision:** Independent domains - abort logic separate from batch completion separate from race conditions
 
-**Dispatch:** (via dispatch tool, or one `pi -p` per terminal pane)
-```
-Agent 1 → Fix agent-tool-abort.test.ts
-Agent 2 → Fix batch-completion-behavior.test.ts
-Agent 3 → Fix tool-approval-race-conditions.test.ts
+**Dispatch:**
+```ts
+subagent({
+  tasks: [
+    { agent: "worker", task: "Fix agent-tool-abort.test.ts" },
+    { agent: "worker", task: "Fix batch-completion-behavior.test.ts" },
+    { agent: "worker", task: "Fix tool-approval-race-conditions.test.ts" },
+  ],
+})
 ```
 
 **Results:**
