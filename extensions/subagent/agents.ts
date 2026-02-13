@@ -5,6 +5,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseFrontmatter } from "@mariozechner/pi-coding-agent";
 
 export type AgentScope = "user" | "project" | "both";
@@ -98,18 +99,24 @@ function findNearestProjectAgentsDir(cwd: string): string | null {
 export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryResult {
 	const userDir = path.join(os.homedir(), ".pi", "agent", "agents");
 	const projectAgentsDir = findNearestProjectAgentsDir(cwd);
+	const thisFile = fileURLToPath(import.meta.url);
+	const packageRoot = path.resolve(path.dirname(thisFile), "..", "..");
+	const bundledAgentsDir = path.join(packageRoot, "agents");
 
 	const userAgents = scope === "project" ? [] : loadAgentsFromDir(userDir, "user");
 	const projectAgents = scope === "user" || !projectAgentsDir ? [] : loadAgentsFromDir(projectAgentsDir, "project");
+	const bundledAgents = scope === "user" ? [] : loadAgentsFromDir(bundledAgentsDir, "project");
 
 	const agentMap = new Map<string, AgentConfig>();
 
 	if (scope === "both") {
+		for (const agent of bundledAgents) agentMap.set(agent.name, agent);
 		for (const agent of userAgents) agentMap.set(agent.name, agent);
 		for (const agent of projectAgents) agentMap.set(agent.name, agent);
 	} else if (scope === "user") {
 		for (const agent of userAgents) agentMap.set(agent.name, agent);
 	} else {
+		for (const agent of bundledAgents) agentMap.set(agent.name, agent);
 		for (const agent of projectAgents) agentMap.set(agent.name, agent);
 	}
 

@@ -16,6 +16,7 @@
   },
   "files": [
     "extensions/",
+    "agents/",
     "skills/",
     "banner.jpg",
     "LICENSE",
