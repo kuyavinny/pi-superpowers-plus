@@ -19,6 +19,11 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
 
+## Boundaries
+- Read code and docs: yes
+- Write to docs/plans/: yes
+- Edit or create any other files: no
+
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**
