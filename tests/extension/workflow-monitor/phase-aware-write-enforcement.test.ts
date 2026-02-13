@@ -85,4 +85,52 @@ describe("phase-aware file write enforcement", () => {
     expect(text).toContain("⚠️ PROCESS VIOLATION");
     expect(text).toContain("docs/plans/");
   });
+
+  test("second process violation hard-blocks (interactive)", async () => {
+    const fake = createFakePi();
+    workflowMonitorExtension(fake.api as any);
+
+    const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
+    const onToolCall = getSingleHandler(fake.handlers, "tool_call");
+
+    let promptCount = 0;
+    const ctx = {
+      hasUI: true,
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "custom",
+            customType: WORKFLOW_TRACKER_ENTRY_TYPE,
+            data: {
+              phases: { brainstorm: "active", plan: "pending", execute: "pending", verify: "pending", review: "pending", finish: "pending" },
+              currentPhase: "brainstorm",
+              artifacts: { brainstorm: null, plan: null, execute: null, verify: null, review: null, finish: null },
+              prompted: { brainstorm: false, plan: false, execute: false, verify: false, review: false, finish: false },
+            },
+          },
+        ],
+      },
+      ui: {
+        setWidget: () => {},
+        select: async (_title: string, options: string[]) => {
+          promptCount += 1;
+          expect(options).toEqual(["Yes, continue", "No, stop"]);
+          return "No, stop";
+        },
+        setEditorText: () => {},
+        notify: () => {},
+      },
+    };
+
+    await onSessionSwitch({}, ctx);
+
+    // 1st violation: allowed
+    await onToolCall({ toolCallId: "w1", toolName: "write", input: { path: "extensions/a.ts", content: "x" } }, ctx);
+
+    // 2nd violation: should block
+    const res = await onToolCall({ toolCallId: "w2", toolName: "write", input: { path: "extensions/b.ts", content: "y" } }, ctx);
+
+    expect(promptCount).toBe(1);
+    expect(res).toEqual({ blocked: true });
+  });
 });

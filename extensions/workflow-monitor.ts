@@ -56,6 +56,32 @@ export default function (pi: ExtensionAPI) {
   const pendingVerificationViolations = new Map<string, VerificationViolation>();
   const pendingBranchGates = new Map<string, string>();
   const pendingProcessWarnings = new Map<string, string>();
+
+  type ViolationBucket = "process" | "practice";
+  const strikes: Record<ViolationBucket, number> = { process: 0, practice: 0 };
+
+  async function maybeEscalate(
+    bucket: ViolationBucket,
+    ctx: ExtensionContext
+  ): Promise<"allow" | "block"> {
+    strikes[bucket] += 1;
+    if (strikes[bucket] < 2) return "allow";
+
+    if (!ctx.hasUI) return "allow";
+
+    const choice = await ctx.ui.select(
+      `The agent has repeatedly violated ${bucket} guardrails. Allow it to continue?`,
+      ["Yes, continue", "No, stop"]
+    );
+
+    if (choice === "Yes, continue") {
+      strikes[bucket] = 0;
+      return "allow";
+    }
+
+    return "block";
+  }
+
   let branchNoticeShown = false;
   let branchConfirmed = false;
 
@@ -124,6 +150,8 @@ export default function (pi: ExtensionAPI) {
       pendingVerificationViolations.clear();
       pendingBranchGates.clear();
       pendingProcessWarnings.clear();
+      strikes.process = 0;
+      strikes.practice = 0;
       branchNoticeShown = false;
       branchConfirmed = false;
       updateWidget(ctx);
@@ -387,6 +415,11 @@ export default function (pi: ExtensionAPI) {
         const isPlansWrite = typeof path === "string" && path.startsWith("docs/plans/");
 
         if (isThinkingPhase && !isPlansWrite) {
+          const escalation = await maybeEscalate("process", ctx);
+          if (escalation === "block") {
+            return { blocked: true };
+          }
+
           pendingProcessWarnings.set(
             toolCallId,
             `⚠️ PROCESS VIOLATION: Wrote ${path} during ${phase} phase.\n` +
