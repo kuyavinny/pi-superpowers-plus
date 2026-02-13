@@ -150,6 +150,7 @@ interface SingleResult {
 	model?: string;
 	stopReason?: string;
 	errorMessage?: string;
+	tddViolations?: number;
 	step?: number;
 }
 
@@ -187,6 +188,39 @@ function getDisplayItems(messages: Message[]): DisplayItem[] {
 	return items;
 }
 
+function isTestCommand(cmd: string): boolean {
+	return (
+		/\bvitest\b/.test(cmd) ||
+		/\bpytest\b/.test(cmd) ||
+		/\bnpm\s+test\b/.test(cmd) ||
+		/\bpnpm\s+test\b/.test(cmd) ||
+		/\byarn\s+test\b/.test(cmd)
+	);
+}
+
+function collectSummary(messages: Message[]): { filesChanged: string[]; testsRan: boolean } {
+	const files = new Set<string>();
+	let testsRan = false;
+
+	for (const msg of messages) {
+		if (msg.role !== "assistant") continue;
+		for (const part of msg.content) {
+			if (part.type !== "toolCall") continue;
+			if ((part.name === "write" || part.name === "edit") && typeof (part.arguments as any)?.path === "string") {
+				files.add((part.arguments as any).path);
+			}
+			if (part.name === "bash") {
+				const cmd = (part.arguments as any)?.command;
+				if (typeof cmd === "string" && isTestCommand(cmd)) testsRan = true;
+			}
+		}
+	}
+
+	return { filesChanged: Array.from(files), testsRan };
+}
+
+export const __internal = { collectSummary };
+
 async function mapWithConcurrencyLimit<TIn, TOut>(
 	items: TIn[],
 	concurrency: number,
@@ -207,12 +241,11 @@ async function mapWithConcurrencyLimit<TIn, TOut>(
 	return results;
 }
 
-function writePromptToTempFile(agentName: string, prompt: string): { dir: string; filePath: string } {
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-"));
+function writePromptToTempFile(tmpDir: string, agentName: string, prompt: string): { filePath: string } {
 	const safeName = agentName.replace(/[^\w.-]+/g, "_");
 	const filePath = path.join(tmpDir, `prompt-${safeName}.md`);
 	fs.writeFileSync(filePath, prompt, { encoding: "utf-8", mode: 0o600 });
-	return { dir: tmpDir, filePath };
+	return { filePath };
 }
 
 type OnUpdateCallback = (partial: AgentToolResult<SubagentDetails>) => void;
@@ -253,8 +286,10 @@ async function runSingleAgent(
 		}
 	}
 
-	let tmpPromptDir: string | null = null;
+	let tmpDir: string | null = null;
 	let tmpPromptPath: string | null = null;
+	let tddViolationsPath: string | null = null;
+	let tddViolations = 0;
 
 	const currentResult: SingleResult = {
 		agent: agentName,
@@ -278,9 +313,10 @@ async function runSingleAgent(
 	};
 
 	try {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-"));
+		tddViolationsPath = path.join(tmpDir, "tdd-violations.txt");
 		if (agent.systemPrompt.trim()) {
-			const tmp = writePromptToTempFile(agent.name, agent.systemPrompt);
-			tmpPromptDir = tmp.dir;
+			const tmp = writePromptToTempFile(tmpDir, agent.name, agent.systemPrompt);
 			tmpPromptPath = tmp.filePath;
 			args.push("--append-system-prompt", tmpPromptPath);
 		}
@@ -289,7 +325,12 @@ async function runSingleAgent(
 		let wasAborted = false;
 
 		const exitCode = await new Promise<number>((resolve) => {
-			const proc = spawn("pi", args, { cwd: cwd ?? defaultCwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
+			const proc = spawn("pi", args, {
+				cwd: cwd ?? defaultCwd,
+				shell: false,
+				stdio: ["ignore", "pipe", "pipe"],
+				env: { ...process.env, PI_TDD_GUARD_VIOLATIONS_FILE: tddViolationsPath },
+			});
 			let buffer = "";
 
 			const processLine = (line: string) => {
@@ -363,6 +404,12 @@ async function runSingleAgent(
 		});
 
 		currentResult.exitCode = exitCode;
+		if (tddViolationsPath && fs.existsSync(tddViolationsPath)) {
+			const raw = fs.readFileSync(tddViolationsPath, "utf-8").trim();
+			const parsed = Number.parseInt(raw || "0", 10);
+			tddViolations = Number.isFinite(parsed) ? parsed : 0;
+		}
+		currentResult.tddViolations = tddViolations;
 		if (wasAborted) throw new Error("Subagent was aborted");
 		return currentResult;
 	} finally {
@@ -372,9 +419,9 @@ async function runSingleAgent(
 			} catch {
 				/* ignore */
 			}
-		if (tmpPromptDir)
+		if (tmpDir)
 			try {
-				fs.rmdirSync(tmpPromptDir);
+				fs.rmSync(tmpDir, { recursive: true, force: true });
 			} catch {
 				/* ignore */
 			}
@@ -628,19 +675,33 @@ export default function (pi: ExtensionAPI) {
 					onUpdate,
 					makeDetails("single"),
 				);
+				const summary = collectSummary(result.messages);
+				const stableDetails = {
+					...makeDetails("single")([result]),
+					status:
+						result.exitCode !== 0 || result.stopReason === "error" || result.stopReason === "aborted"
+							? ("failed" as const)
+							: ("completed" as const),
+					agent: result.agent,
+					task: result.task,
+					result: getFinalOutput(result.messages),
+					filesChanged: summary.filesChanged,
+					testsRan: summary.testsRan,
+					tddViolations: result.tddViolations ?? 0,
+				};
 				const isError = result.exitCode !== 0 || result.stopReason === "error" || result.stopReason === "aborted";
 				if (isError) {
 					const errorMsg =
 						result.errorMessage || result.stderr || getFinalOutput(result.messages) || "(no output)";
 					return {
 						content: [{ type: "text", text: `Agent ${result.stopReason || "failed"}: ${errorMsg}` }],
-						details: makeDetails("single")([result]),
+						details: stableDetails,
 						isError: true,
 					};
 				}
 				return {
 					content: [{ type: "text", text: getFinalOutput(result.messages) || "(no output)" }],
-					details: makeDetails("single")([result]),
+					details: stableDetails,
 				};
 			}
 
