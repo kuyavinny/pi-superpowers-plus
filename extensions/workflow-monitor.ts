@@ -8,6 +8,7 @@
  * - Register workflow_reference tool for on-demand reference content
  */
 
+import * as path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
@@ -416,13 +417,16 @@ export default function (pi: ExtensionAPI) {
     let changed = false;
 
     if (event.toolName === "write" || event.toolName === "edit") {
-      const path = input.path as string | undefined;
-      if (path) {
+      const filePath = input.path as string | undefined;
+      if (filePath) {
         const state = handler.getWorkflowState();
         const phase = state?.currentPhase;
         const isThinkingPhase = phase === "brainstorm" || phase === "plan";
-        const normalizedPath = path.startsWith("./") ? path.slice(2) : path;
-        const isPlansWrite = normalizedPath.startsWith("docs/plans/");
+        let normalizedForCheck = filePath;
+        if (normalizedForCheck.startsWith("./")) normalizedForCheck = normalizedForCheck.slice(2);
+        const resolved = path.resolve(process.cwd(), normalizedForCheck);
+        const plansRoot = path.join(process.cwd(), "docs", "plans") + path.sep;
+        const isPlansWrite = resolved.startsWith(plansRoot);
 
         if (isThinkingPhase && !isPlansWrite) {
           const escalation = await maybeEscalate("process", ctx);
@@ -432,12 +436,12 @@ export default function (pi: ExtensionAPI) {
 
           pendingProcessWarnings.set(
             toolCallId,
-            `⚠️ PROCESS VIOLATION: Wrote ${path} during ${phase} phase.\n` +
+            `⚠️ PROCESS VIOLATION: Wrote ${filePath} during ${phase} phase.\n` +
               "During brainstorming/planning you may only write to docs/plans/. Stop and return to docs/plans/ or advance workflow phases intentionally."
           );
         }
 
-        changed = handler.handleFileWritten(normalizedPath) || changed;
+        changed = handler.handleFileWritten(filePath) || changed;
       }
 
       if (!branchConfirmed) {
