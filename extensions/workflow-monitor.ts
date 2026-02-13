@@ -64,10 +64,10 @@ export default function (pi: ExtensionAPI) {
     bucket: ViolationBucket,
     ctx: ExtensionContext
   ): Promise<"allow" | "block"> {
+    if (!ctx.hasUI) return "allow";
+
     strikes[bucket] += 1;
     if (strikes[bucket] < 2) return "allow";
-
-    if (!ctx.hasUI) return "allow";
 
     const choice = await ctx.ui.select(
       `The agent has repeatedly violated ${bucket} guardrails. Allow it to continue?`,
