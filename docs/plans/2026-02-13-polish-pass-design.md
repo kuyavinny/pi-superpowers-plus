@@ -70,6 +70,7 @@ Map matched skill names to phases using the existing `SKILL_PHASE_MAP`. Same cod
 - Test `onInputText` with `<skill name="brainstorming" location="...">` triggers brainstorm phase
 - Test `onInputText` with `<skill name="verification-before-completion"` triggers verify phase
 - Test full sequence (brainstorm → plan → execute → verify → review) advances phases correctly with no false skip warnings
+- Test that during brainstorm phase, committing a design doc to `docs/plans/` does NOT trigger a verification warning
 
 ### Regression:
 - Run full existing test suite
