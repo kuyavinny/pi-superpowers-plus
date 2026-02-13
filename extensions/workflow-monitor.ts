@@ -55,6 +55,7 @@ export default function (pi: ExtensionAPI) {
   const pendingViolations = new Map<string, Violation>();
   const pendingVerificationViolations = new Map<string, VerificationViolation>();
   const pendingBranchGates = new Map<string, string>();
+  const pendingProcessWarnings = new Map<string, string>();
   let branchNoticeShown = false;
   let branchConfirmed = false;
 
@@ -122,6 +123,7 @@ export default function (pi: ExtensionAPI) {
       pendingViolations.clear();
       pendingVerificationViolations.clear();
       pendingBranchGates.clear();
+      pendingProcessWarnings.clear();
       branchNoticeShown = false;
       branchConfirmed = false;
       updateWidget(ctx);
@@ -379,6 +381,19 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName === "write" || event.toolName === "edit") {
       const path = input.path as string | undefined;
       if (path) {
+        const state = handler.getWorkflowState();
+        const phase = state?.currentPhase;
+        const isThinkingPhase = phase === "brainstorm" || phase === "plan";
+        const isPlansWrite = typeof path === "string" && path.startsWith("docs/plans/");
+
+        if (isThinkingPhase && !isPlansWrite) {
+          pendingProcessWarnings.set(
+            toolCallId,
+            `⚠️ PROCESS VIOLATION: Wrote ${path} during ${phase} phase.\n` +
+              "During brainstorming/planning you may only write to docs/plans/. Stop and return to docs/plans/ or advance workflow phases intentionally."
+          );
+        }
+
         changed = handler.handleFileWritten(path) || changed;
       }
 
@@ -439,6 +454,12 @@ export default function (pi: ExtensionAPI) {
         injected.push(formatViolationWarning(violation));
       }
       pendingViolations.delete(toolCallId);
+
+      const processWarning = pendingProcessWarnings.get(toolCallId);
+      if (processWarning) {
+        injected.push(processWarning);
+      }
+      pendingProcessWarnings.delete(toolCallId);
     }
 
     // Handle bash results (test runs, commits, investigation)
