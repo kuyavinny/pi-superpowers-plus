@@ -59,23 +59,30 @@ export default function (pi: ExtensionAPI) {
 
   type ViolationBucket = "process" | "practice";
   const strikes: Record<ViolationBucket, number> = { process: 0, practice: 0 };
+  const sessionAllowed: Partial<Record<ViolationBucket, boolean>> = {};
 
   async function maybeEscalate(
     bucket: ViolationBucket,
     ctx: ExtensionContext
   ): Promise<"allow" | "block"> {
     if (!ctx.hasUI) return "allow";
+    if (sessionAllowed[bucket]) return "allow";
 
     strikes[bucket] += 1;
     if (strikes[bucket] < 2) return "allow";
 
     const choice = await ctx.ui.select(
       `The agent has repeatedly violated ${bucket} guardrails. Allow it to continue?`,
-      ["Yes, continue", "No, stop"]
+      ["Yes, continue", "Yes, allow all for this session", "No, stop"]
     );
 
     if (choice === "Yes, continue") {
       strikes[bucket] = 0;
+      return "allow";
+    }
+
+    if (choice === "Yes, allow all for this session") {
+      sessionAllowed[bucket] = true;
       return "allow";
     }
 
@@ -152,6 +159,8 @@ export default function (pi: ExtensionAPI) {
       pendingProcessWarnings.clear();
       strikes.process = 0;
       strikes.practice = 0;
+      delete sessionAllowed.process;
+      delete sessionAllowed.practice;
       branchNoticeShown = false;
       branchConfirmed = false;
       updateWidget(ctx);
