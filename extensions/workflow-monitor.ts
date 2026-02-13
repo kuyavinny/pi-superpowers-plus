@@ -27,6 +27,7 @@ import {
   WORKFLOW_PHASES,
   WORKFLOW_TRACKER_ENTRY_TYPE,
   computeBoundaryToPrompt,
+  parseSkillName,
   type Phase,
   type TransitionBoundary,
   type WorkflowTrackerState,
@@ -115,9 +116,9 @@ export default function (pi: ExtensionAPI) {
     let furthestIdx = -1;
 
     for (const line of lines) {
-      const match = line.match(/^\s*\/skill:([^\s]+)/);
-      if (!match) continue;
-      const phase = skillToPhase[match[1]] ?? null;
+      const skill = parseSkillName(line);
+      if (!skill) continue;
+      const phase = skillToPhase[skill] ?? null;
       if (!phase) continue;
       const idx = WORKFLOW_PHASES.indexOf(phase);
       if (idx > furthestIdx) {

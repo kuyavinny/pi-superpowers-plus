@@ -67,6 +67,12 @@ function emptyState(): WorkflowTrackerState {
 
 export const WORKFLOW_TRACKER_ENTRY_TYPE = "workflow_tracker_state";
 
+export function parseSkillName(line: string): string | null {
+  const slashMatch = line.match(/^\s*\/skill:([^\s]+)/);
+  const xmlMatch = line.match(/<skill\s+name="([^"]+)"/);
+  return slashMatch?.[1] ?? xmlMatch?.[1] ?? null;
+}
+
 const PLANS_DIR_RE = /^docs\/plans\//;
 const DESIGN_RE = /-design\.md$/;
 const IMPLEMENTATION_RE = /-implementation\.md$/;
@@ -147,10 +153,8 @@ export class WorkflowTracker {
     let changed = false;
 
     for (const line of lines) {
-      const match = line.match(/^\s*\/skill:([^\s]+)/);
-      if (!match) continue;
-
-      const skill = match[1];
+      const skill = parseSkillName(line);
+      if (!skill) continue;
       let phase: Phase | null = null;
 
       if (skill === "brainstorming") phase = "brainstorm";
