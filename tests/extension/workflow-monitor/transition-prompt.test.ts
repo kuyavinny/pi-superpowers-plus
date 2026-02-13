@@ -5,36 +5,7 @@ import {
   WorkflowTracker,
   computeBoundaryToPrompt,
 } from "../../../extensions/workflow-monitor/workflow-tracker";
-
-type Handler = (event: any, ctx: any) => any;
-
-function createFakePi() {
-  const handlers = new Map<string, Handler[]>();
-  const appendedEntries: any[] = [];
-
-  return {
-    handlers,
-    appendedEntries,
-    api: {
-      on(event: string, handler: Handler) {
-        const list = handlers.get(event) ?? [];
-        list.push(handler);
-        handlers.set(event, list);
-      },
-      registerTool() {},
-      registerCommand() {},
-      appendEntry(customType: string, data: any) {
-        appendedEntries.push({ customType, data });
-      },
-    },
-  };
-}
-
-function getSingleHandler(handlers: Map<string, Handler[]>, event: string): Handler {
-  const list = handlers.get(event) ?? [];
-  expect(list.length).toBeGreaterThan(0);
-  return list[0]!;
-}
+import { createFakePi, getSingleHandler } from "./test-helpers";
 
 describe("boundary prompting", () => {
   test("prompts after brainstorm complete", () => {
@@ -46,7 +17,7 @@ describe("boundary prompting", () => {
   });
 
   test("does not auto-complete active phase on generic agent_end", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({ withAppendEntry: true });
     workflowMonitorExtension(fake.api as any);
 
     const onInput = getSingleHandler(fake.handlers, "input");
@@ -73,7 +44,7 @@ describe("boundary prompting", () => {
       },
     };
 
-    await onInput({ source: "user", input: "/skill:writing-plans" }, ctx);
+    await onInput({ source: "user", text: "/skill:writing-plans" }, ctx);
     inAgentEnd = true;
     await onAgentEnd({}, ctx);
 
@@ -81,7 +52,7 @@ describe("boundary prompting", () => {
   });
 
   test("prompts once for completed boundary and does not re-prompt", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({ withAppendEntry: true });
     workflowMonitorExtension(fake.api as any);
 
     const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
@@ -130,7 +101,7 @@ describe("boundary prompting", () => {
   });
 
   test("skip marks next phase skipped and advances beyond it", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({ withAppendEntry: true });
     workflowMonitorExtension(fake.api as any);
 
     const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
@@ -178,7 +149,7 @@ describe("boundary prompting", () => {
   });
 
   test("skip on terminal next phase marks it skipped without advancing into it", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({ withAppendEntry: true });
     workflowMonitorExtension(fake.api as any);
 
     const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
@@ -240,7 +211,7 @@ describe("boundary prompting", () => {
   });
 
   test("boundary prompt passes string labels to ui.select", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({ withAppendEntry: true });
     workflowMonitorExtension(fake.api as any);
 
     const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
@@ -290,7 +261,7 @@ describe("boundary prompting", () => {
   });
 
   test("verification boundary is prompted only after passing verification signal", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({ withAppendEntry: true });
     workflowMonitorExtension(fake.api as any);
 
     const onInput = getSingleHandler(fake.handlers, "input");
@@ -318,7 +289,7 @@ describe("boundary prompting", () => {
       },
     };
 
-    await onInput({ source: "user", input: "/skill:verification-before-completion" }, ctx);
+    await onInput({ source: "user", text: "/skill:verification-before-completion" }, ctx);
 
     inAgentEnd = true;
     await onAgentEnd({}, ctx);
@@ -341,7 +312,7 @@ describe("boundary prompting", () => {
   });
 
   test("finish transition pre-fills docs + learnings reminder", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({ withAppendEntry: true });
     workflowMonitorExtension(fake.api as any);
 
     const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");

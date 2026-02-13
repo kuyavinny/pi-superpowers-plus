@@ -1,6 +1,6 @@
 {
   "name": "pi-superpowers-plus",
-  "version": "0.1.0-alpha.3",
+  "version": "0.2.0-alpha.1",
   "description": "Superpowers workflow skills adapted for pi",
   "keywords": [
     "pi-package"
@@ -16,6 +16,7 @@
   },
   "files": [
     "extensions/",
+    "agents/",
     "skills/",
     "banner.jpg",
     "LICENSE",
@@ -24,7 +25,8 @@
   "pi": {
     "extensions": [
       "extensions/plan-tracker.ts",
-      "extensions/workflow-monitor.ts"
+      "extensions/workflow-monitor.ts",
+      "extensions/subagent/index.ts"
     ],
     "skills": [
       "skills"

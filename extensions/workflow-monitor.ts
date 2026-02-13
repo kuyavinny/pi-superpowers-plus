@@ -8,6 +8,7 @@
  * - Register workflow_reference tool for on-demand reference content
  */
 
+import * as path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
@@ -26,6 +27,7 @@ import {
   WORKFLOW_PHASES,
   WORKFLOW_TRACKER_ENTRY_TYPE,
   computeBoundaryToPrompt,
+  parseSkillName,
   type Phase,
   type TransitionBoundary,
   type WorkflowTrackerState,
@@ -114,9 +116,9 @@ export default function (pi: ExtensionAPI) {
     let furthestIdx = -1;
 
     for (const line of lines) {
-      const match = line.match(/^\s*\/skill:([^\s]+)/);
-      if (!match) continue;
-      const phase = skillToPhase[match[1]] ?? null;
+      const skill = parseSkillName(line);
+      if (!skill) continue;
+      const phase = skillToPhase[skill] ?? null;
       if (!phase) continue;
       const idx = WORKFLOW_PHASES.indexOf(phase);
       if (idx > furthestIdx) {
@@ -161,7 +163,10 @@ export default function (pi: ExtensionAPI) {
   // --- Input observation (skill detection + skip-confirmation gate) ---
   pi.on("input", async (event, ctx) => {
     if (event.source === "extension") return;
-    const text = (event.input as string | undefined) ?? "";
+    const text =
+      (event.text as string | undefined) ??
+      (event.input as string | undefined) ??
+      "";
 
     const targetPhase = parseTargetPhase(text);
 
@@ -364,31 +369,26 @@ export default function (pi: ExtensionAPI) {
     if (event.toolName === "bash") {
       const command = ((event.input as Record<string, any>).command as string | undefined) ?? "";
 
-      // Completion action gating (interactive only)
-      if (ctx.hasUI) {
+      const state = handler.getWorkflowState();
+      const phaseIdx = state?.currentPhase ? WORKFLOW_PHASES.indexOf(state.currentPhase) : -1;
+      const executeIdx = WORKFLOW_PHASES.indexOf("execute");
+
+      // Completion action gating (interactive only, execute+ phases)
+      if (ctx.hasUI && state && phaseIdx >= executeIdx) {
         const actionTarget = getCompletionActionTarget(command);
         if (actionTarget) {
-          const currentState = handler.getWorkflowState();
-          if (currentState) {
-            const unresolved = getUnresolvedPhasesForAction(actionTarget, currentState);
-            if (unresolved.length > 0) {
-              const gateResult = await promptCompletionGate(unresolved, ctx);
-              if (gateResult === "blocked") {
-                return { blocked: true };
-              }
-              // If allowed (skipped), record waiver if verify was among skipped
-              // so verification warning isn't re-flagged
-              if (unresolved.includes("verify")) {
-                handler.recordVerificationWaiver();
-              }
+          const unresolved = getUnresolvedPhasesForAction(actionTarget, state);
+          if (unresolved.length > 0) {
+            const gateResult = await promptCompletionGate(unresolved, ctx);
+            if (gateResult === "blocked") {
+              return { blocked: true };
+            }
+            if (unresolved.includes("verify")) {
+              handler.recordVerificationWaiver();
             }
           }
         }
       }
-
-      const state = handler.getWorkflowState();
-      const phaseIdx = state?.currentPhase ? WORKFLOW_PHASES.indexOf(state.currentPhase) : -1;
-      const executeIdx = WORKFLOW_PHASES.indexOf("execute");
 
       if (phaseIdx >= executeIdx) {
         const verificationViolation = handler.checkCommitGate(command);
@@ -418,13 +418,16 @@ export default function (pi: ExtensionAPI) {
     let changed = false;
 
     if (event.toolName === "write" || event.toolName === "edit") {
-      const path = input.path as string | undefined;
-      if (path) {
+      const filePath = input.path as string | undefined;
+      if (filePath) {
         const state = handler.getWorkflowState();
         const phase = state?.currentPhase;
         const isThinkingPhase = phase === "brainstorm" || phase === "plan";
-        const normalizedPath = path.startsWith("./") ? path.slice(2) : path;
-        const isPlansWrite = normalizedPath.startsWith("docs/plans/");
+        let normalizedForCheck = filePath;
+        if (normalizedForCheck.startsWith("./")) normalizedForCheck = normalizedForCheck.slice(2);
+        const resolved = path.resolve(process.cwd(), normalizedForCheck);
+        const plansRoot = path.join(process.cwd(), "docs", "plans") + path.sep;
+        const isPlansWrite = resolved.startsWith(plansRoot);
 
         if (isThinkingPhase && !isPlansWrite) {
           const escalation = await maybeEscalate("process", ctx);
@@ -434,12 +437,12 @@ export default function (pi: ExtensionAPI) {
 
           pendingProcessWarnings.set(
             toolCallId,
-            `⚠️ PROCESS VIOLATION: Wrote ${path} during ${phase} phase.\n` +
+            `⚠️ PROCESS VIOLATION: Wrote ${filePath} during ${phase} phase.\n` +
               "During brainstorming/planning you may only write to docs/plans/. Stop and return to docs/plans/ or advance workflow phases intentionally."
           );
         }
 
-        changed = handler.handleFileWritten(normalizedPath) || changed;
+        changed = handler.handleFileWritten(filePath) || changed;
       }
 
       if (!branchConfirmed) {

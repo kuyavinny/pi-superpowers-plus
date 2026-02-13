@@ -7,40 +7,7 @@ import {
   type PhaseStatus,
   type WorkflowTrackerState,
 } from "../../../extensions/workflow-monitor/workflow-tracker";
-
-type Handler = (event: any, ctx: any) => any;
-
-function createFakePi() {
-  const handlers = new Map<string, Handler[]>();
-  const appendedEntries: any[] = [];
-
-  return {
-    handlers,
-    appendedEntries,
-    api: {
-      on(event: string, handler: Handler) {
-        const list = handlers.get(event) ?? [];
-        list.push(handler);
-        handlers.set(event, list);
-      },
-      registerTool() {},
-      registerCommand() {},
-      appendEntry(customType: string, data: any) {
-        appendedEntries.push({ customType, data });
-      },
-    },
-  };
-}
-
-function getHandlers(handlers: Map<string, Handler[]>, event: string): Handler[] {
-  return handlers.get(event) ?? [];
-}
-
-function getSingleHandler(handlers: Map<string, Handler[]>, event: string): Handler {
-  const list = handlers.get(event) ?? [];
-  expect(list.length).toBeGreaterThan(0);
-  return list[0]!;
-}
+import { createFakePi, getSingleHandler } from "./test-helpers";
 
 function createWorkflowState(
   overrides: Partial<Record<Phase, PhaseStatus>>,
@@ -89,7 +56,7 @@ function createCtx(
 }
 
 async function setupExtension(state: WorkflowTrackerState) {
-  const fake = createFakePi();
+  const fake = createFakePi({ withAppendEntry: true });
   workflowMonitorExtension(fake.api as any);
 
   const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
@@ -100,6 +67,36 @@ async function setupExtension(state: WorkflowTrackerState) {
 }
 
 describe("completion-action gating on bash commands", () => {
+  test("commit during brainstorm does not prompt completion gate", async () => {
+    const state = createWorkflowState(
+      {
+        brainstorm: "active",
+        plan: "pending",
+        execute: "pending",
+        verify: "pending",
+        review: "pending",
+        finish: "pending",
+      },
+      "brainstorm"
+    );
+
+    const { onSessionSwitch, onToolCall } = await setupExtension(state);
+    const { ctx } = createCtx(state, true, ["Do verify now"]);
+
+    await onSessionSwitch({}, ctx);
+
+    await onToolCall(
+      {
+        toolCallId: "tc1",
+        toolName: "bash",
+        input: { command: "git commit -m 'docs: brainstorm'" },
+      },
+      ctx
+    );
+
+    expect(ctx.ui.select).not.toHaveBeenCalled();
+  });
+
   test("interactive commit with unresolved verify -> Do now blocks + editor set to /skill:verification-before-completion", async () => {
     const state = createWorkflowState(
       {

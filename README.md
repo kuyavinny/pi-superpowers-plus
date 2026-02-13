@@ -10,9 +10,10 @@ Your coding agent doesn't just know the rules - it follows them. Skills teach th
 
 **12 workflow skills** that guide the agent through a structured development process - from brainstorming ideas through shipping code.
 
-**2 extensions** that run silently in the background:
-- **Workflow Monitor** - enforces TDD discipline, tracks debug cycles, gates commits on verification, tracks workflow phase, and serves reference content on demand.
-- **Plan Tracker** - tracks task progress with a TUI widget.
+**3 extensions** that run silently in the background:
+- **Workflow Monitor** — enforces TDD discipline, tracks debug cycles, gates commits on verification, tracks workflow phase, and serves reference content on demand.
+- **Subagent** — registers a `subagent` tool for dispatching implementation and review work to isolated subprocess agents, with bundled agent definitions and structured results.
+- **Plan Tracker** — tracks task progress with a TUI widget.
 
 **After installation**:
 - Any time the agent writes a source file without a failing test, it gets a warning injected into the tool result.
@@ -245,15 +246,74 @@ Skills are markdown files the agent reads to learn *what* to do. Extensions are 
 | Investigate before fixing | `systematic-debugging` | Debug monitor warns on fix-without-investigation |
 | Run tests before claiming done | `verification-before-completion` | Verification gate blocks commit/push/PR |
 | Follow workflow phases | All skills cross-reference each other | Workflow tracker detects phases, prompts at boundaries |
+| Dispatch implementation work | `subagent-driven-development` | Subagent extension spawns isolated agents |
+| Review before merge | `requesting-code-review` | Subagent dispatches code-reviewer agent |
+| Enforce TDD in subagents | — | tdd-guard blocks writes until tests pass |
 
-The agent can always override - enforcement is advisory, not blocking. But warnings are injected directly into tool results so the agent can't miss them.
+The orchestrating agent's enforcement is advisory (warnings injected into tool results). Subagent enforcement via tdd-guard is harder: writes are blocked outright, and repeated violations terminate the subprocess.
 
 ## Subagent Dispatch
 
-Skills that reference subagent dispatch (subagent-driven-development, requesting-code-review, dispatching-parallel-agents) work with any dispatch mechanism:
+A bundled `subagent` tool lets the orchestrating agent spawn isolated subprocess agents for implementation and review tasks. No external dependencies required.
 
-- **With pi-superteam:** The agent uses the `team` tool automatically
-- **Without pi-superteam:** The agent runs `pi -p "prompt"` via bash
+### Bundled Agents
+
+| Agent | Purpose | Tools | Extensions |
+|-------|---------|-------|------------|
+| `implementer` | Strict TDD implementation | read, write, edit, bash, lsp | tdd-guard |
+| `worker` | General-purpose task execution | read, write, edit, bash, lsp | tdd-guard |
+| `code-reviewer` | Production readiness review | read, bash (read-only) | — |
+| `spec-reviewer` | Plan/spec compliance check | read, bash (read-only) | — |
+
+Agent definitions live in `agents/*.md` and use YAML frontmatter to declare tools, model, extensions, and a system prompt body.
+
+### Single Agent
+
+```ts
+subagent({ agent: "implementer", task: "Implement the retry logic per docs/plans/retry-plan.md Task 3" })
+```
+
+### Parallel Tasks
+
+```ts
+subagent({
+  tasks: [
+    { agent: "worker", task: "Fix failing test in auth.test.ts" },
+    { agent: "worker", task: "Fix failing test in cache.test.ts" },
+  ],
+})
+```
+
+### Structured Results
+
+Single-agent results include:
+- `filesChanged` — list of files written/edited
+- `testsRan` — whether any test commands were executed
+- `tddViolations` — count of blocked production writes (from tdd-guard)
+- `status` — `"completed"` or `"failed"`
+
+### TDD Guard
+
+The `tdd-guard` extension ships alongside the subagent system. When declared in an agent's frontmatter, it:
+- **Blocks** writes to non-test files until a *passing* test run is observed
+- **Tracks violations** via a temp file (reported in structured results)
+- **Hard-exits** after 3 consecutive blocked writes (prevents runaway agents)
+
+### Custom Agents
+
+Add `.md` files to an `agents/` directory at your project root. They override bundled agents of the same name. Frontmatter fields:
+
+```yaml
+---
+name: my-agent
+description: What this agent does
+tools: read, write, edit, bash
+model: claude-sonnet-4-5
+extensions: ../extensions/my-guard.ts
+---
+
+System prompt body here.
+```
 
 ## Compared to Superpowers
 
@@ -264,34 +324,47 @@ Based on [Superpowers](https://github.com/obra/superpowers) by Jesse Vincent, po
 | **Platform** | Claude Code | pi | pi |
 | **Skills** | 12 workflow skills | Same 12 skills (pi port) | Same 12 skills (leaner TDD & debug) |
 | **TDD enforcement** | Skill tells agent the rules | Skill tells agent the rules | Extension *watches* and injects warnings |
-| **TDD widget** | - | - | TUI: RED → GREEN → REFACTOR |
+| **TDD widget** | — | — | TUI: RED → GREEN → REFACTOR |
 | **Debug enforcement** | Manual discipline | Manual discipline | Extension escalates after repeated failures |
-| **Verification gating** | - | - | Blocks commit/push/PR until tests pass |
-| **Workflow tracking** | - | - | Phase strip, boundary prompts, `/workflow-next` |
+| **Verification gating** | — | — | Blocks commit/push/PR until tests pass |
+| **Workflow tracking** | — | — | Phase strip, boundary prompts, `/workflow-next` |
+| **Subagent dispatch** | — | — | Bundled `subagent` tool + 4 agent definitions |
+| **TDD in subagents** | — | — | tdd-guard extension blocks writes until tests pass |
+| **Structured results** | — | — | filesChanged, testsRan, tddViolations per agent |
 | **Reference content** | Everything in SKILL.md | Everything in SKILL.md | Lean skill + on-demand `workflow_reference` tool |
-| **Plan tracker** | - | - | `plan_tracker` tool with TUI progress widget |
+| **Plan tracker** | — | — | `plan_tracker` tool with TUI progress widget |
 
 ## Architecture
 
 ```
 pi-superpowers-plus/
+├── agents/                            # Bundled agent definitions (4 agents)
+│   ├── implementer.md                 # Strict TDD implementation agent
+│   ├── worker.md                      # General-purpose task agent
+│   ├── code-reviewer.md               # Production readiness reviewer
+│   └── spec-reviewer.md               # Plan/spec compliance reviewer
 ├── extensions/
 │   ├── plan-tracker.ts                # Task tracking tool + TUI widget
+│   ├── tdd-guard.ts                   # TDD enforcement for subagents
 │   ├── workflow-monitor.ts            # Extension entry point (event wiring)
-│   └── workflow-monitor/
-│       ├── tdd-monitor.ts             # TDD phase state machine
-│       ├── debug-monitor.ts           # Debug mode escalation
-│       ├── verification-monitor.ts    # Commit/push/PR gating
-│       ├── workflow-tracker.ts        # Workflow phase tracking
-│       ├── workflow-transitions.ts    # Phase boundary prompt definitions
-│       ├── workflow-handler.ts        # Testable core logic (combines monitors)
-│       ├── heuristics.ts             # File classification (test vs source)
-│       ├── test-runner.ts            # Test command/result detection
-│       ├── investigation.ts          # Investigation signal detection
-│       ├── git.ts                    # Git branch/SHA detection (branch safety)
-│       ├── warnings.ts              # Violation warning content
-│       └── reference-tool.ts        # On-demand reference loading
-├── skills/                           # 12 workflow skills (24 markdown files)
+│   ├── workflow-monitor/
+│   │   ├── tdd-monitor.ts             # TDD phase state machine
+│   │   ├── debug-monitor.ts           # Debug mode escalation
+│   │   ├── verification-monitor.ts    # Commit/push/PR gating
+│   │   ├── workflow-tracker.ts        # Workflow phase tracking + parseSkillName
+│   │   ├── workflow-transitions.ts    # Phase boundary prompt definitions
+│   │   ├── workflow-handler.ts        # Testable core logic (combines monitors)
+│   │   ├── heuristics.ts             # File classification (test vs source)
+│   │   ├── test-runner.ts            # Test command/result detection
+│   │   ├── investigation.ts          # Investigation signal detection
+│   │   ├── git.ts                    # Git branch/SHA detection (branch safety)
+│   │   ├── warnings.ts              # Violation warning content
+│   │   ├── skip-confirmation.ts      # Phase-skip confirmation logic
+│   │   └── reference-tool.ts        # On-demand reference loading
+│   └── subagent/
+│       ├── index.ts                   # Subagent tool registration + execution
+│       └── agents.ts                  # Agent discovery + frontmatter parsing
+├── skills/                           # 12 workflow skills (26 markdown files)
 │   ├── brainstorming/
 │   ├── writing-plans/
 │   ├── executing-plans/
@@ -304,7 +377,7 @@ pi-superpowers-plus/
 │   ├── dispatching-parallel-agents/
 │   ├── using-git-worktrees/
 │   └── finishing-a-development-branch/
-└── tests/                            # 184 unit tests across 18 files
+└── tests/                            # 251 tests across 29 files
 ```
 
 ## Development

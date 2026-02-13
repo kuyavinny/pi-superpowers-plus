@@ -99,9 +99,20 @@ digraph process {
 - `./code-quality-reviewer-prompt.md` - Dispatch code quality reviewer subagent
 
 **How to dispatch:**
-- If a dispatch tool is available (e.g. pi-superteam's `team` tool), use it
-- Otherwise, run a second pi instance: `pi -p "prompt from template"`
-- For parallel tasks, use multiple terminal panes (one per task)
+
+Use the `subagent` tool directly with the template text filled in:
+
+```ts
+subagent({ agent: "implementer", task: "... full implementer prompt text ..." })
+```
+
+```ts
+subagent({ agent: "spec-reviewer", task: "... full review prompt text ..." })
+```
+
+```ts
+subagent({ agent: "code-reviewer", task: "... full review prompt text ..." })
+```
 
 ## Example Workflow
 

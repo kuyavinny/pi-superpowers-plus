@@ -1,31 +1,6 @@
 import { describe, test, expect } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
-
-type Handler = (event: any, ctx: any) => any;
-
-function createFakePi() {
-  const handlers = new Map<string, Handler[]>();
-
-  return {
-    handlers,
-    api: {
-      on(event: string, handler: Handler) {
-        const list = handlers.get(event) ?? [];
-        list.push(handler);
-        handlers.set(event, list);
-      },
-      registerTool() {},
-      registerCommand() {},
-      appendEntry() {},
-    },
-  };
-}
-
-function getSingleHandler(handlers: Map<string, Handler[]>, event: string): Handler {
-  const list = handlers.get(event) ?? [];
-  expect(list.length).toBeGreaterThan(0);
-  return list[0]!;
-}
+import { createFakePi, getSingleHandler } from "./test-helpers";
 
 describe("workflow monitor widget", () => {
   test("shows workflow phase strip when a workflow phase is active", async () => {
@@ -46,7 +21,7 @@ describe("workflow monitor widget", () => {
     };
 
     const onInput = getSingleHandler(fake.handlers, "input");
-    await onInput({ source: "user", input: "/skill:writing-plans" }, ctx);
+    await onInput({ source: "user", text: "/skill:writing-plans" }, ctx);
 
     expect(renderer).toBeTypeOf("function");
 
