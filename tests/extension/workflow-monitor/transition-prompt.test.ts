@@ -62,7 +62,7 @@ describe("boundary prompting", () => {
         select: async (_title: string, options: any[]) => {
           if (inAgentEnd) {
             agentEndSelectCalls += 1;
-            return "discuss";
+            return "Discuss";
           }
           // Gate prompt: skip single or skip_all for multi
           const hasSkipAll = options?.includes?.("Skip all and continue");
@@ -115,7 +115,7 @@ describe("boundary prompting", () => {
         setWidget: () => {},
         select: async () => {
           agentEndSelectCalls += 1;
-          return "discuss";
+          return "Discuss";
         },
         setEditorText: () => {},
         notify: () => {},
@@ -162,7 +162,7 @@ describe("boundary prompting", () => {
       },
       ui: {
         setWidget: () => {},
-        select: async () => "skip",
+        select: async () => "Skip",
         setEditorText: (text: string) => editorTexts.push(text),
         notify: () => {},
       },
@@ -224,7 +224,7 @@ describe("boundary prompting", () => {
       },
       ui: {
         setWidget: () => {},
-        select: async () => "skip",
+        select: async () => "Skip",
         setEditorText: (text: string) => editorTexts.push(text),
         notify: () => {},
       },
@@ -237,6 +237,56 @@ describe("boundary prompting", () => {
     expect(latest.phases.finish).toBe("skipped");
     expect(latest.currentPhase).toBe("review");
     expect(editorTexts).toHaveLength(0);
+  });
+
+  test("boundary prompt passes string labels to ui.select", async () => {
+    const fake = createFakePi();
+    workflowMonitorExtension(fake.api as any);
+
+    const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
+    const onAgentEnd = getSingleHandler(fake.handlers, "agent_end");
+
+    const ctx = {
+      hasUI: true,
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "custom",
+            customType: WORKFLOW_TRACKER_ENTRY_TYPE,
+            data: {
+              phases: {
+                brainstorm: "complete",
+                plan: "pending",
+                execute: "active",
+                verify: "pending",
+                review: "pending",
+                finish: "pending",
+              },
+              currentPhase: "execute",
+              artifacts: { brainstorm: null, plan: null, execute: null, verify: null, review: null, finish: null },
+              prompted: { brainstorm: false, plan: false, execute: false, verify: false, review: false, finish: false },
+            },
+          },
+        ],
+      },
+      ui: {
+        setWidget: () => {},
+        select: async (_title: string, options: any[]) => {
+          expect(options).toEqual([
+            "Next step (this session)",
+            "Fresh session → next step",
+            "Skip",
+            "Discuss",
+          ]);
+          return "Discuss";
+        },
+        setEditorText: () => {},
+        notify: () => {},
+      },
+    };
+
+    await onSessionSwitch({}, ctx);
+    await onAgentEnd({}, ctx);
   });
 
   test("verification boundary is prompted only after passing verification signal", async () => {
@@ -258,7 +308,7 @@ describe("boundary prompting", () => {
         select: async (_title: string, options: any[]) => {
           if (inAgentEnd) {
             agentEndSelectCalls += 1;
-            return "discuss";
+            return "Discuss";
           }
           const hasSkipAll = options?.includes?.("Skip all and continue");
           return hasSkipAll ? "Skip all and continue" : "Skip verify";
@@ -338,7 +388,7 @@ describe("boundary prompting", () => {
       },
       ui: {
         setWidget: () => {},
-        select: async () => "next",
+        select: async () => "Next step (this session)",
         setEditorText: (text: string) => editorTexts.push(text),
         notify: () => {},
       },

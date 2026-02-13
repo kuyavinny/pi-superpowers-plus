@@ -497,13 +497,10 @@ export default function (pi: ExtensionAPI) {
     const boundaryPhase = boundaryToPhase[boundary];
     const prompt = getTransitionPrompt(boundary, latestState.artifacts[boundaryPhase]);
 
-    const options = prompt.options.map((o) => ({ label: o.label, value: o.choice }));
-    const result = await ctx.ui.select(prompt.title, options as any);
+    const options = prompt.options.map((o) => o.label);
+    const pickedLabel = await ctx.ui.select(prompt.title, options as any);
 
-    const selected =
-      typeof result === "string"
-        ? prompt.options.find((o) => o.choice === result || o.label === result)?.choice
-        : result?.value ?? result?.choice ?? null;
+    const selected = prompt.options.find((o) => o.label === pickedLabel)?.choice ?? null;
 
     const marked = handler.markWorkflowPrompted(boundaryPhase);
     if (marked) {
