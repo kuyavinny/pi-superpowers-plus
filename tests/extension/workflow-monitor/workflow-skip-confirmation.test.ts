@@ -7,36 +7,7 @@ import {
   type PhaseStatus,
   type WorkflowTrackerState,
 } from "../../../extensions/workflow-monitor/workflow-tracker";
-
-type Handler = (event: any, ctx: any) => any;
-
-function createFakePi() {
-  const handlers = new Map<string, Handler[]>();
-  const appendedEntries: any[] = [];
-
-  return {
-    handlers,
-    appendedEntries,
-    api: {
-      on(event: string, handler: Handler) {
-        const list = handlers.get(event) ?? [];
-        list.push(handler);
-        handlers.set(event, list);
-      },
-      registerTool() {},
-      registerCommand() {},
-      appendEntry(customType: string, data: any) {
-        appendedEntries.push({ customType, data });
-      },
-    },
-  };
-}
-
-function getSingleHandler(handlers: Map<string, Handler[]>, event: string): Handler {
-  const list = handlers.get(event) ?? [];
-  expect(list.length).toBeGreaterThan(0);
-  return list[0]!;
-}
+import { createFakePi, getSingleHandler } from "./test-helpers";
 
 function createWorkflowState(
   overrides: Partial<Record<Phase, PhaseStatus>>,
@@ -55,7 +26,7 @@ function createWorkflowState(
 }
 
 function setupWithState(state: WorkflowTrackerState) {
-  const fake = createFakePi();
+  const fake = createFakePi({ withAppendEntry: true });
   workflowMonitorExtension(fake.api as any);
 
   const onSessionSwitch = getSingleHandler(fake.handlers, "session_switch");
