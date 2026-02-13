@@ -181,3 +181,35 @@ describe("WorkflowTracker detection helpers", () => {
     expect(reconstructed?.currentPhase).toBe("execute");
   });
 });
+
+describe("XML skill detection in onInputText", () => {
+  test("detects <skill name=\"brainstorming\"> XML and advances to brainstorm", () => {
+    const tracker = new WorkflowTracker();
+    const changed = tracker.onInputText('<skill name="brainstorming" location="/home/pi/skills/brainstorming/SKILL.md">');
+    expect(changed).toBe(true);
+    expect(tracker.getState().currentPhase).toBe("brainstorm");
+  });
+
+  test("detects <skill name=\"verification-before-completion\"> XML and advances to verify", () => {
+    const tracker = new WorkflowTracker();
+    const changed = tracker.onInputText('<skill name="verification-before-completion" location="/path">content</skill>');
+    expect(changed).toBe(true);
+    expect(tracker.getState().currentPhase).toBe("verify");
+  });
+
+  test("detects XML skill in multi-line input with other content", () => {
+    const tracker = new WorkflowTracker();
+    const changed = tracker.onInputText('Some context\n<skill name="writing-plans" location="/path">\nplan content\n</skill>');
+    expect(changed).toBe(true);
+    expect(tracker.getState().currentPhase).toBe("plan");
+  });
+
+  test("XML skill detection picks furthest phase from multiple matches", () => {
+    const tracker = new WorkflowTracker();
+    const changed = tracker.onInputText(
+      '<skill name="brainstorming" location="/a">\n</skill>\n<skill name="executing-plans" location="/b">\n</skill>'
+    );
+    expect(changed).toBe(true);
+    expect(tracker.getState().currentPhase).toBe("execute");
+  });
+});

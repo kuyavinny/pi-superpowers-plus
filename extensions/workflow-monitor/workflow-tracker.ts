@@ -147,10 +147,10 @@ export class WorkflowTracker {
     let changed = false;
 
     for (const line of lines) {
-      const match = line.match(/^\s*\/skill:([^\s]+)/);
-      if (!match) continue;
-
-      const skill = match[1];
+      const slashMatch = line.match(/^\s*\/skill:([^\s]+)/);
+      const xmlMatch = line.match(/<skill\s+name="([^"]+)"/);
+      const skill = slashMatch?.[1] ?? xmlMatch?.[1] ?? null;
+      if (!skill) continue;
       let phase: Phase | null = null;
 
       if (skill === "brainstorming") phase = "brainstorm";
