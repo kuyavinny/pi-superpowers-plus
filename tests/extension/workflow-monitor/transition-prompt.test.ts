@@ -65,8 +65,8 @@ describe("boundary prompting", () => {
             return "discuss";
           }
           // Gate prompt: skip single or skip_all for multi
-          const hasSkipAll = options?.some?.((o: any) => o.value === "skip_all");
-          return hasSkipAll ? "skip_all" : "skip";
+          const hasSkipAll = options?.includes?.("Skip all and continue");
+          return hasSkipAll ? "Skip all and continue" : "Skip brainstorm";
         },
         setEditorText: () => {},
         notify: () => {},
@@ -260,8 +260,8 @@ describe("boundary prompting", () => {
             agentEndSelectCalls += 1;
             return "discuss";
           }
-          const hasSkipAll = options?.some?.((o: any) => o.value === "skip_all");
-          return hasSkipAll ? "skip_all" : "skip";
+          const hasSkipAll = options?.includes?.("Skip all and continue");
+          return hasSkipAll ? "Skip all and continue" : "Skip verify";
         },
         setEditorText: () => {},
         notify: () => {},

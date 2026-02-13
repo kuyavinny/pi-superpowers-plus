@@ -40,7 +40,7 @@ describe("workflow monitor widget", () => {
         setWidget: (_id: string, widget: any) => {
           renderer = widget;
         },
-        select: async () => "skip",
+        select: async () => "Skip brainstorm",
         setEditorText: () => {},
       },
     };
