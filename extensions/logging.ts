@@ -13,6 +13,7 @@ import * as path from "node:path";
 export interface LoggerOptions {
   verbose?: boolean;
   maxSizeBytes?: number;
+  rotationCheckInterval?: number;
 }
 
 export interface Logger {
@@ -23,6 +24,7 @@ export interface Logger {
 }
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const DEFAULT_ROTATION_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 
 function formatError(err: unknown): string {
   if (err instanceof Error) {
@@ -38,7 +40,9 @@ function timestamp(): string {
 export function createLogger(logPath: string, options?: LoggerOptions): Logger {
   const verbose = options?.verbose ?? false;
   const maxSizeBytes = options?.maxSizeBytes ?? DEFAULT_MAX_SIZE;
-  let rotatedThisSession = false;
+  const rotationCheckInterval = options?.rotationCheckInterval ?? DEFAULT_ROTATION_CHECK_INTERVAL;
+  /** Timestamp (ms) of the last rotation size check. Re-checks after rotationCheckInterval. */
+  let lastRotationCheck = -Infinity;
 
   function ensureDir(): void {
     const dir = path.dirname(logPath);
@@ -47,8 +51,15 @@ export function createLogger(logPath: string, options?: LoggerOptions): Logger {
     }
   }
 
+  /**
+   * Rotate the log file if it exceeds maxSizeBytes.
+   * Re-checks at most once per rotationCheckInterval (default 1 hour)
+   * so long-running processes can still rotate without checking on every write.
+   */
   function rotateIfNeeded(): void {
-    if (rotatedThisSession) return;
+    const now = Date.now();
+    if (now - lastRotationCheck < rotationCheckInterval) return;
+    lastRotationCheck = now;
     try {
       const stat = fs.statSync(logPath);
       if (stat.size > maxSizeBytes) {
@@ -57,7 +68,6 @@ export function createLogger(logPath: string, options?: LoggerOptions): Logger {
     } catch {
       // File doesn't exist yet — nothing to rotate
     }
-    rotatedThisSession = true;
   }
 
   function write(level: string, message: string): void {

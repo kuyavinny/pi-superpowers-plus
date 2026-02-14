@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -17,6 +17,7 @@ describe("logging", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -109,5 +110,27 @@ describe("logging", () => {
     log.info("fresh");
 
     expect(fs.readFileSync(rotatedPath, "utf-8")).toBe("x".repeat(200));
+  });
+
+  test("rotation can run again after rotationCheckInterval", () => {
+    const rotatedPath = logPath + ".1";
+    const nowSpy = vi.spyOn(Date, "now");
+
+    fs.writeFileSync(logPath, "x".repeat(200));
+    nowSpy.mockReturnValue(0);
+
+    const log = createLogger(logPath, {
+      maxSizeBytes: 100,
+      rotationCheckInterval: 1000,
+    });
+
+    log.info("first");
+    expect(fs.readFileSync(rotatedPath, "utf-8")).toBe("x".repeat(200));
+
+    fs.writeFileSync(logPath, "y".repeat(200));
+    nowSpy.mockReturnValue(1500);
+
+    log.info("second");
+    expect(fs.readFileSync(rotatedPath, "utf-8")).toBe("y".repeat(200));
   });
 });
