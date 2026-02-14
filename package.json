@@ -6,7 +6,9 @@
     "pi-package"
   ],
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "biome check .",
+    "check": "biome check . && vitest run"
   },
   "license": "MIT",
   "author": "coctostan",
