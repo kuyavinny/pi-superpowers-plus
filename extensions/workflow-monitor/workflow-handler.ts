@@ -95,7 +95,7 @@ export function createWorkflowHandler(): WorkflowHandler {
             verification.reset();
           }
 
-          const excludeFromDebug = !passed && tdd.getPhase() === "red" && tdd.isRedVerificationPending();
+          const excludeFromDebug = !passed && tdd.getPhase() === "red-pending";
 
           tdd.onTestResult(passed);
 

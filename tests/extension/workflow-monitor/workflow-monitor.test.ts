@@ -38,7 +38,7 @@ describe("WorkflowHandler", () => {
 
   test("handles bash test command result", () => {
     handler.handleToolCall("write", { path: "src/utils.test.ts", content: "test" });
-    expect(handler.getTddPhase()).toBe("red");
+    expect(handler.getTddPhase()).toBe("red-pending");
 
     handler.handleBashResult("npx vitest run", "Tests  1 passed", 0);
     expect(handler.getTddPhase()).toBe("green");
