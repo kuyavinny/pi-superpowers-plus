@@ -1,30 +1,25 @@
 import { describe, expect, test } from "vitest";
 import {
-  WORKFLOW_PHASES,
-  type Phase,
-  type PhaseStatus,
-  type WorkflowTrackerState,
-} from "../../../extensions/workflow-monitor/workflow-tracker";
-import {
   getUnresolvedPhases,
   getUnresolvedPhasesBefore,
   isPhaseUnresolved,
 } from "../../../extensions/workflow-monitor/skip-confirmation";
+import {
+  type Phase,
+  type PhaseStatus,
+  WORKFLOW_PHASES,
+  type WorkflowTrackerState,
+} from "../../../extensions/workflow-monitor/workflow-tracker";
 
 function createState(overrides: Partial<Record<Phase, PhaseStatus>>): WorkflowTrackerState {
-  const phases = Object.fromEntries(
-    WORKFLOW_PHASES.map((phase) => [phase, overrides[phase] ?? "complete"])
-  ) as Record<Phase, PhaseStatus>;
-
-  const artifacts = Object.fromEntries(WORKFLOW_PHASES.map((phase) => [phase, null])) as Record<
+  const phases = Object.fromEntries(WORKFLOW_PHASES.map((phase) => [phase, overrides[phase] ?? "complete"])) as Record<
     Phase,
-    string | null
+    PhaseStatus
   >;
 
-  const prompted = Object.fromEntries(WORKFLOW_PHASES.map((phase) => [phase, false])) as Record<
-    Phase,
-    boolean
-  >;
+  const artifacts = Object.fromEntries(WORKFLOW_PHASES.map((phase) => [phase, null])) as Record<Phase, string | null>;
+
+  const prompted = Object.fromEntries(WORKFLOW_PHASES.map((phase) => [phase, false])) as Record<Phase, boolean>;
 
   return {
     phases,
@@ -119,9 +114,6 @@ describe("skip-confirmation helpers", () => {
       plan: "complete",
     });
 
-    expect(getUnresolvedPhases(["review", "finish", "plan"], state)).toEqual([
-      "review",
-      "finish",
-    ]);
+    expect(getUnresolvedPhases(["review", "finish", "plan"], state)).toEqual(["review", "finish"]);
   });
 });

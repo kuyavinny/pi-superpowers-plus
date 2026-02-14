@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { __internal } from "../../../extensions/subagent/index";
 
 describe("subagent structured summary", () => {

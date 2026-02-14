@@ -6,7 +6,9 @@
     "pi-package"
   ],
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "biome check .",
+    "check": "biome check . && vitest run"
   },
   "license": "MIT",
   "author": "coctostan",
@@ -39,6 +41,7 @@
     "@sinclair/typebox": "*"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.15",
     "vitest": "^4.0.18"
   }
 }

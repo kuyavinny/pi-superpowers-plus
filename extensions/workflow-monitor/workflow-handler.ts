@@ -1,15 +1,11 @@
+import type { SessionEntry } from "@mariozechner/pi-coding-agent";
 import { DebugMonitor, type DebugViolation } from "./debug-monitor";
 import { isSourceFile } from "./heuristics";
 import { isInvestigationCommand } from "./investigation";
 import { TddMonitor, type TddPhase, type TddViolation } from "./tdd-monitor";
 import { parseTestCommand, parseTestResult } from "./test-runner";
 import { VerificationMonitor, type VerificationViolation } from "./verification-monitor";
-import {
-  WorkflowTracker,
-  type WorkflowTrackerState,
-  type Phase,
-} from "./workflow-tracker";
-import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+import { type Phase, WorkflowTracker, type WorkflowTrackerState } from "./workflow-tracker";
 
 export type Violation = TddViolation | DebugViolation;
 
@@ -29,12 +25,7 @@ export interface WorkflowHandler {
   getTddState(): ReturnType<TddMonitor["getState"]>;
   checkCommitGate(command: string): VerificationViolation | null;
   recordVerificationWaiver(): void;
-  restoreTddState(
-    phase: TddPhase,
-    testFiles: string[],
-    sourceFiles: string[],
-    redVerificationPending?: boolean
-  ): void;
+  restoreTddState(phase: TddPhase, testFiles: string[], sourceFiles: string[], redVerificationPending?: boolean): void;
   handleInputText(text: string): boolean;
   handleFileWritten(path: string): boolean;
   handlePlanTrackerToolCall(input: Record<string, any>): boolean;
@@ -104,8 +95,7 @@ export function createWorkflowHandler(): WorkflowHandler {
             verification.reset();
           }
 
-          const excludeFromDebug =
-            !passed && tdd.getPhase() === "red" && tdd.isRedVerificationPending();
+          const excludeFromDebug = !passed && tdd.getPhase() === "red" && tdd.isRedVerificationPending();
 
           tdd.onTestResult(passed);
 
@@ -167,12 +157,7 @@ export function createWorkflowHandler(): WorkflowHandler {
       verification.recordVerificationWaiver();
     },
 
-    restoreTddState(
-      phase: TddPhase,
-      testFiles: string[],
-      sourceFiles: string[],
-      redVerificationPending = false
-    ) {
+    restoreTddState(phase: TddPhase, testFiles: string[], sourceFiles: string[], redVerificationPending = false) {
       tdd.setState(phase, testFiles, sourceFiles, redVerificationPending);
     },
 

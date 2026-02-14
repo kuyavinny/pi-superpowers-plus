@@ -1,6 +1,10 @@
 import type { SessionEntry } from "@mariozechner/pi-coding-agent";
-import { describe, test, expect, beforeEach } from "vitest";
-import { WorkflowTracker, WORKFLOW_PHASES, parseSkillName } from "../../../extensions/workflow-monitor/workflow-tracker";
+import { beforeEach, describe, expect, test } from "vitest";
+import {
+  parseSkillName,
+  WORKFLOW_PHASES,
+  WorkflowTracker,
+} from "../../../extensions/workflow-monitor/workflow-tracker";
 
 describe("WorkflowTracker", () => {
   let tracker: WorkflowTracker;
@@ -93,7 +97,7 @@ function custom(data: any): SessionEntry {
 }
 
 describe("WorkflowTracker detection helpers", () => {
-  test("parseSkillName extracts /skill and <skill name=\"...\">", () => {
+  test('parseSkillName extracts /skill and <skill name="...">', () => {
     expect(parseSkillName("/skill:writing-plans blah")).toBe("writing-plans");
     expect(parseSkillName('  <skill name="brainstorming" location="/x">')).toBe("brainstorming");
     expect(parseSkillName("nope /skill:writing-plans")).toBeNull();
@@ -124,9 +128,7 @@ describe("WorkflowTracker detection helpers", () => {
     const tracker = new WorkflowTracker();
     tracker.advanceTo("plan");
 
-    const changed = tracker.onInputText(
-      "/skill:brainstorming\n/skill:verification-before-completion run checks"
-    );
+    const changed = tracker.onInputText("/skill:brainstorming\n/skill:verification-before-completion run checks");
 
     expect(changed).toBe(true);
     expect(tracker.getState().currentPhase).toBe("verify");

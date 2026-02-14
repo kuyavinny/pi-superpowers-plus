@@ -1,13 +1,6 @@
 import type { SessionEntry } from "@mariozechner/pi-coding-agent";
 
-export const WORKFLOW_PHASES = [
-  "brainstorm",
-  "plan",
-  "execute",
-  "verify",
-  "review",
-  "finish",
-] as const;
+export const WORKFLOW_PHASES = ["brainstorm", "plan", "execute", "verify", "review", "finish"] as const;
 
 export type Phase = (typeof WORKFLOW_PHASES)[number];
 export type PhaseStatus = "pending" | "active" | "complete" | "skipped";
@@ -50,17 +43,11 @@ function cloneState(state: WorkflowTrackerState): WorkflowTrackerState {
 }
 
 function emptyState(): WorkflowTrackerState {
-  const phases = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, "pending"])
-  ) as Record<Phase, PhaseStatus>;
+  const phases = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, "pending"])) as Record<Phase, PhaseStatus>;
 
-  const artifacts = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, null])
-  ) as Record<Phase, string | null>;
+  const artifacts = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, null])) as Record<Phase, string | null>;
 
-  const prompted = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, false])
-  ) as Record<Phase, boolean>;
+  const prompted = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, false])) as Record<Phase, boolean>;
 
   return { phases, currentPhase: null, artifacts, prompted };
 }

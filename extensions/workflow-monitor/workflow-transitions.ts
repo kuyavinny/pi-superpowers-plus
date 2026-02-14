@@ -17,10 +17,7 @@ const BASE_OPTIONS: TransitionPrompt["options"] = [
   { choice: "discuss", label: "Discuss" },
 ];
 
-export function getTransitionPrompt(
-  boundary: TransitionBoundary,
-  artifactPath: string | null
-): TransitionPrompt {
+export function getTransitionPrompt(boundary: TransitionBoundary, artifactPath: string | null): TransitionPrompt {
   switch (boundary) {
     case "design_committed":
       return {

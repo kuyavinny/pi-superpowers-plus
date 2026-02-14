@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 import { WORKFLOW_TRACKER_ENTRY_TYPE } from "../../../extensions/workflow-monitor/workflow-tracker";
 import { createFakePi, getSingleHandler } from "./test-helpers";
@@ -50,7 +50,7 @@ describe("verification gate phase-awareness", () => {
         content: [{ type: "text", text: "ok" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
 
     const text = (res?.content ?? [])

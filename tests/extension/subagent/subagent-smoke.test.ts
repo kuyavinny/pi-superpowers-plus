@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import subagentExtension from "../../../extensions/subagent";
 
 describe("subagent extension", () => {
@@ -14,7 +14,7 @@ describe("subagent extension", () => {
     expect(registerTool).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "subagent",
-      })
+      }),
     );
   });
 });

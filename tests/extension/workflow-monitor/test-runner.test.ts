@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { parseTestCommand, parseTestResult } from "../../../extensions/workflow-monitor/test-runner";
 
 describe("parseTestCommand", () => {

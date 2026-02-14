@@ -9,7 +9,7 @@
 import { StringEnum } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import { Type, type Static } from "@sinclair/typebox";
+import { type Static, Type } from "@sinclair/typebox";
 
 type TaskStatus = "pending" | "in_progress" | "complete";
 
@@ -31,18 +31,18 @@ const PlanTrackerParams = Type.Object({
   tasks: Type.Optional(
     Type.Array(Type.String(), {
       description: "Task names (for init)",
-    })
+    }),
   ),
   index: Type.Optional(
     Type.Integer({
       minimum: 0,
       description: "Task index, 0-based (for update)",
-    })
+    }),
   ),
   status: Type.Optional(
     StringEnum(["pending", "in_progress", "complete"] as const, {
       description: "New status (for update)",
-    })
+    }),
   ),
 });
 
@@ -66,9 +66,7 @@ function formatWidget(tasks: Task[], theme: Theme): string {
     .join("");
 
   // Find current task (first in_progress, or first pending)
-  const current =
-    tasks.find((t) => t.status === "in_progress") ??
-    tasks.find((t) => t.status === "pending");
+  const current = tasks.find((t) => t.status === "in_progress") ?? tasks.find((t) => t.status === "pending");
   const currentName = current ? `  ${current.name}` : "";
 
   return `${theme.fg("muted", "Tasks:")} ${icons} ${theme.fg("muted", `(${complete}/${tasks.length})`)}${currentName}`;
@@ -86,8 +84,7 @@ function formatStatus(tasks: Task[]): string {
   lines.push("");
   for (let i = 0; i < tasks.length; i++) {
     const t = tasks[i];
-    const icon =
-      t.status === "complete" ? "✓" : t.status === "in_progress" ? "→" : "○";
+    const icon = t.status === "complete" ? "✓" : t.status === "in_progress" ? "→" : "○";
     lines.push(`  ${icon} [${i}] ${t.name}`);
   }
   return lines.join("\n");
@@ -121,12 +118,7 @@ export default function (pi: ExtensionAPI) {
   };
 
   // Reconstruct state + widget on session events
-  for (const event of [
-    "session_start",
-    "session_switch",
-    "session_fork",
-    "session_tree",
-  ] as const) {
+  for (const event of ["session_start", "session_switch", "session_fork", "session_tree"] as const) {
     pi.on(event, async (_event, ctx) => {
       reconstructState(ctx);
       updateWidget(ctx);
@@ -169,9 +161,7 @@ export default function (pi: ExtensionAPI) {
         case "update": {
           if (params.index === undefined || !params.status) {
             return {
-              content: [
-                { type: "text", text: "Error: index and status required for update" },
-              ],
+              content: [{ type: "text", text: "Error: index and status required for update" }],
               details: {
                 action: "update",
                 tasks: [...tasks],
@@ -279,18 +269,16 @@ export default function (pi: ExtensionAPI) {
       switch (details.action) {
         case "init":
           return new Text(
-            theme.fg("success", "✓ ") +
-              theme.fg("muted", `Plan initialized with ${taskList.length} tasks`),
+            theme.fg("success", "✓ ") + theme.fg("muted", `Plan initialized with ${taskList.length} tasks`),
             0,
-            0
+            0,
           );
         case "update": {
           const complete = taskList.filter((t) => t.status === "complete").length;
           return new Text(
-            theme.fg("success", "✓ ") +
-              theme.fg("muted", `Updated (${complete}/${taskList.length} complete)`),
+            theme.fg("success", "✓ ") + theme.fg("muted", `Updated (${complete}/${taskList.length} complete)`),
             0,
-            0
+            0,
           );
         }
         case "status": {
@@ -311,11 +299,7 @@ export default function (pi: ExtensionAPI) {
           return new Text(text, 0, 0);
         }
         case "clear":
-          return new Text(
-            theme.fg("success", "✓ ") + theme.fg("muted", "Plan cleared"),
-            0,
-            0
-          );
+          return new Text(theme.fg("success", "✓ ") + theme.fg("muted", "Plan cleared"), 0, 0);
         default:
           return new Text(theme.fg("dim", "Done"), 0, 0);
       }

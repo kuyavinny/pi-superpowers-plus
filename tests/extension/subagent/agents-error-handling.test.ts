@@ -1,7 +1,7 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
 import * as fs from "node:fs";
-import * as path from "node:path";
 import * as os from "node:os";
+import * as path from "node:path";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import * as logging from "../../../extensions/logging.js";
 

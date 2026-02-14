@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 
 type Handler = (event: any, ctx: any) => any;
@@ -112,7 +112,10 @@ describe("practice escalation", () => {
     await onToolCall({ toolCallId: "t1", toolName: "write", input: { path: "src/a.ts", content: "x" } }, ctx);
 
     // 2nd TDD violation: should block
-    const res = await onToolCall({ toolCallId: "t2", toolName: "write", input: { path: "src/b.ts", content: "y" } }, ctx);
+    const res = await onToolCall(
+      { toolCallId: "t2", toolName: "write", input: { path: "src/b.ts", content: "y" } },
+      ctx,
+    );
 
     expect(promptCount).toBe(1);
     expect(res).toEqual({ blocked: true });

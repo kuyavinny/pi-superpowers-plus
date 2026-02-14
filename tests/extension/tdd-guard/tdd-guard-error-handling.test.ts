@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import * as logging from "../../../extensions/logging.js";
 
 const { writeFileSyncMock } = vi.hoisted(() => ({

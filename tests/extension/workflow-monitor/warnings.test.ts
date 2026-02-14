@@ -1,7 +1,7 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
-  getTddViolationWarning,
   getDebugViolationWarning,
+  getTddViolationWarning,
   getVerificationViolationWarning,
 } from "../../../extensions/workflow-monitor/warnings";
 

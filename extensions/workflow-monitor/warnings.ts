@@ -41,11 +41,7 @@ export type VerificationViolationType =
   | "push-without-verification"
   | "pr-without-verification";
 
-export function getDebugViolationWarning(
-  type: DebugViolationType,
-  file: string,
-  fixAttempts: number
-): string {
+export function getDebugViolationWarning(type: DebugViolationType, file: string, fixAttempts: number): string {
   if (type === "fix-without-investigation") {
     return `
 ⚠️ DEBUG VIOLATION: You edited production code (${file}) without investigating first.
@@ -86,16 +82,9 @@ Discuss with your human partner before attempting more fixes.
   return `⚠️ DEBUG WARNING: Unexpected violation type "${type}" for ${file}`;
 }
 
-export function getVerificationViolationWarning(
-  type: VerificationViolationType,
-  command: string
-): string {
+export function getVerificationViolationWarning(type: VerificationViolationType, command: string): string {
   const action =
-    type === "commit-without-verification"
-      ? "commit"
-      : type === "push-without-verification"
-        ? "push"
-        : "create a PR";
+    type === "commit-without-verification" ? "commit" : type === "push-without-verification" ? "push" : "create a PR";
 
   return `
 ⚠️ VERIFICATION REQUIRED: You're about to ${action} without running verification.

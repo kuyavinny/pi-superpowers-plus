@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import * as logging from "../../../extensions/logging.js";
 
 const { readFileMock } = vi.hoisted(() => ({
@@ -34,9 +34,9 @@ describe("reference-tool.ts error handling", () => {
 
     const result = await loadReference("tdd-rationalizations");
 
-    expect(result).toContain("Error loading reference \"tdd-rationalizations\"");
+    expect(result).toContain('Error loading reference "tdd-rationalizations"');
     expect(logging.log.warn).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to load reference \"tdd-rationalizations\""),
+      expect.stringContaining('Failed to load reference "tdd-rationalizations"'),
     );
   });
 

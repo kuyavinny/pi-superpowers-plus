@@ -1,9 +1,9 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 import {
+  computeBoundaryToPrompt,
   WORKFLOW_TRACKER_ENTRY_TYPE,
   WorkflowTracker,
-  computeBoundaryToPrompt,
 } from "../../../extensions/workflow-monitor/workflow-tracker";
 import { createFakePi, getSingleHandler } from "./test-helpers";
 
@@ -243,12 +243,7 @@ describe("boundary prompting", () => {
       ui: {
         setWidget: () => {},
         select: async (_title: string, options: any[]) => {
-          expect(options).toEqual([
-            "Next step (this session)",
-            "Fresh session → next step",
-            "Skip",
-            "Discuss",
-          ]);
+          expect(options).toEqual(["Next step (this session)", "Fresh session → next step", "Skip", "Discuss"]);
           return "Discuss";
         },
         setEditorText: () => {},
@@ -303,7 +298,7 @@ describe("boundary prompting", () => {
         content: [{ type: "text", text: "167 passed" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
 
     inAgentEnd = true;

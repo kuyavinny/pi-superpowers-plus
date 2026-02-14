@@ -1,6 +1,6 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "node:events";
 import * as fs from "node:fs";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import * as logging from "../../../extensions/logging.js";
 

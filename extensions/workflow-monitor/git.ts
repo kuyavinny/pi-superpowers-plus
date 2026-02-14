@@ -25,9 +25,7 @@ export function getCurrentGitRef(cwd: string = process.cwd()): string | null {
 
     return sha || null;
   } catch (err) {
-    log.warn(
-      `Failed to determine git ref in ${cwd}: ${err instanceof Error ? err.message : err}`,
-    );
+    log.warn(`Failed to determine git ref in ${cwd}: ${err instanceof Error ? err.message : err}`);
     return null;
   }
 }
