@@ -25,6 +25,8 @@ export interface Logger {
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 const DEFAULT_ROTATION_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
+export const MAX_MESSAGE_LENGTH = 10 * 1024; // 10 KB
+const TRUNCATED_MARKER = "...(truncated)";
 
 function formatError(err: unknown): string {
   if (err instanceof Error) {
@@ -34,7 +36,13 @@ function formatError(err: unknown): string {
 }
 
 function timestamp(): string {
+  // Strip milliseconds + trailing Z so log lines stay compact and second-precision.
   return new Date().toISOString().replace(/\.\d{3}Z$/, "");
+}
+
+function truncateMessage(message: string): string {
+  if (message.length <= MAX_MESSAGE_LENGTH) return message;
+  return message.slice(0, MAX_MESSAGE_LENGTH - TRUNCATED_MARKER.length) + TRUNCATED_MARKER;
 }
 
 export function createLogger(logPath: string, options?: LoggerOptions): Logger {
@@ -70,11 +78,14 @@ export function createLogger(logPath: string, options?: LoggerOptions): Logger {
     }
   }
 
+  /**
+   * Append a log line to the file. Uses synchronous I/O for simplicity and ordering guarantees — acceptable for low-volume diagnostic logging.
+   */
   function write(level: string, message: string): void {
     try {
       ensureDir();
       rotateIfNeeded();
-      const line = `${timestamp()} [${level}] ${message}\n`;
+      const line = `${timestamp()} [${level}] ${truncateMessage(message)}\n`;
       fs.appendFileSync(logPath, line, "utf-8");
     } catch {
       // Logger must never crash the application

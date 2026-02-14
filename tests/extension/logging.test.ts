@@ -5,7 +5,7 @@ import * as path from "node:path";
 
 // We'll test the internal createLogger factory, not the singleton,
 // so each test gets its own log file in a temp dir.
-import { createLogger } from "../../extensions/logging.js";
+import { createLogger, MAX_MESSAGE_LENGTH } from "../../extensions/logging.js";
 
 describe("logging", () => {
   let tmpDir: string;
@@ -132,5 +132,21 @@ describe("logging", () => {
 
     log.info("second");
     expect(fs.readFileSync(rotatedPath, "utf-8")).toBe("y".repeat(200));
+  });
+
+  test("messages over 10KB are truncated with a marker", () => {
+    const log = createLogger(logPath);
+    const marker = "...(truncated)";
+    const originalMessage = "a".repeat(MAX_MESSAGE_LENGTH + 64);
+
+    log.info(originalMessage);
+
+    const content = fs.readFileSync(logPath, "utf-8");
+    const line = content.trimEnd();
+    const loggedMessage = line.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \[INFO\] /, "");
+
+    expect(loggedMessage.length).toBe(MAX_MESSAGE_LENGTH);
+    expect(loggedMessage.endsWith(marker)).toBe(true);
+    expect(loggedMessage).toBe("a".repeat(MAX_MESSAGE_LENGTH - marker.length) + marker);
   });
 });
