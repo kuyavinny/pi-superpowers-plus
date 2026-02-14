@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import tddGuardExtension from "../../../extensions/tdd-guard";
 
 type Handler = (event: any, ctx: any) => any;
@@ -35,7 +35,7 @@ describe("tdd-guard", () => {
 
     const res = await onToolCall(
       { toolCallId: "w1", toolName: "write", input: { path: "src/x.ts", content: "export const x = 1" } },
-      { hasUI: false }
+      { hasUI: false },
     );
 
     expect(res).toEqual({ blocked: true });
@@ -48,18 +48,15 @@ describe("tdd-guard", () => {
     const onToolCall = getSingleHandler(fake.handlers, "tool_call");
     const onToolResult = getSingleHandler(fake.handlers, "tool_result");
 
-    await onToolCall(
-      { toolCallId: "t1", toolName: "bash", input: { command: "npm test" } },
-      { hasUI: false }
-    );
+    await onToolCall({ toolCallId: "t1", toolName: "bash", input: { command: "npm test" } }, { hasUI: false });
     await onToolResult(
       { toolCallId: "t1", toolName: "bash", input: { command: "npm test" }, details: { exitCode: 1 } },
-      { hasUI: false }
+      { hasUI: false },
     );
 
     const res = await onToolCall(
       { toolCallId: "w1", toolName: "write", input: { path: "src/x.ts", content: "export const x = 1" } },
-      { hasUI: false }
+      { hasUI: false },
     );
 
     expect(res).toEqual({ blocked: true });
@@ -72,18 +69,15 @@ describe("tdd-guard", () => {
     const onToolCall = getSingleHandler(fake.handlers, "tool_call");
     const onToolResult = getSingleHandler(fake.handlers, "tool_result");
 
-    await onToolCall(
-      { toolCallId: "t1", toolName: "bash", input: { command: "npm test" } },
-      { hasUI: false }
-    );
+    await onToolCall({ toolCallId: "t1", toolName: "bash", input: { command: "npm test" } }, { hasUI: false });
     await onToolResult(
       { toolCallId: "t1", toolName: "bash", input: { command: "npm test" }, details: { exitCode: 0 } },
-      { hasUI: false }
+      { hasUI: false },
     );
 
     const res = await onToolCall(
       { toolCallId: "w1", toolName: "write", input: { path: "src/x.ts", content: "export const x = 1" } },
-      { hasUI: false }
+      { hasUI: false },
     );
 
     expect(res).toBeUndefined();

@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import * as logging from "../../../extensions/logging.js";
 
 vi.mock("../../../extensions/logging.js", async (importOriginal) => {
@@ -24,9 +24,7 @@ describe("git.ts error handling", () => {
   test("logs warning and returns null when not in a git repo", () => {
     const result = getCurrentGitRef("/tmp");
     expect(result).toBeNull();
-    expect(logging.log.warn).toHaveBeenCalledWith(
-      expect.stringContaining("git"),
-    );
+    expect(logging.log.warn).toHaveBeenCalledWith(expect.stringContaining("git"));
   });
 
   test("returns branch name without warning in a real repo", () => {

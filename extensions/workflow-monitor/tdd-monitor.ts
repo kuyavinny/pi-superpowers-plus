@@ -1,4 +1,4 @@
-import { isTestFile, isSourceFile } from "./heuristics";
+import { isSourceFile, isTestFile } from "./heuristics";
 
 export type TddPhase = "idle" | "red" | "green" | "refactor";
 
@@ -66,12 +66,7 @@ export class TddMonitor {
     this.sourceFilesWritten.clear();
   }
 
-  setState(
-    phase: TddPhase,
-    testFiles: string[],
-    sourceFiles: string[],
-    redVerificationPending = false
-  ): void {
+  setState(phase: TddPhase, testFiles: string[], sourceFiles: string[], redVerificationPending = false): void {
     this.phase = phase;
     this.testFilesWritten = new Set(testFiles);
     this.sourceFilesWritten = new Set(sourceFiles);

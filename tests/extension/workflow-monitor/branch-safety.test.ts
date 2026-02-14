@@ -1,10 +1,12 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 
 type Handler = (event: any, ctx: any) => any;
 
 vi.mock("node:child_process", () => ({ execSync: vi.fn() }));
+
 import { execSync } from "node:child_process";
+
 const execSyncMock = execSync as unknown as ReturnType<typeof vi.fn>;
 
 function createFakePi() {
@@ -61,7 +63,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "hi" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
 
     expect(res?.content?.[0]?.type).toBe("text");
@@ -87,10 +89,7 @@ describe("branch safety monitor", () => {
       ui: { setWidget: () => {} },
     };
 
-    await onToolCall(
-      { toolCallId: "first-write", toolName: "write", input: { path: "README.md", content: "x" } },
-      ctx
-    );
+    await onToolCall({ toolCallId: "first-write", toolName: "write", input: { path: "README.md", content: "x" } }, ctx);
 
     const res = await onToolResult(
       {
@@ -100,7 +99,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     const text = res.content[0].text as string;
@@ -134,7 +133,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "one" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
     expect(res1.content[0].text as string).toContain("branch-a");
 
@@ -153,7 +152,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "two" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
 
     expect(res2.content[0].text as string).toContain("branch-b");
@@ -186,13 +185,10 @@ describe("branch safety monitor", () => {
         toolCallId: "img-1",
         toolName: "read",
         input: { path: "mock.png" },
-        content: [
-          { type: "text", text: "original text" },
-          originalImage,
-        ],
+        content: [{ type: "text", text: "original text" }, originalImage],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     expect(res?.content?.[0]?.type).toBe("text");
@@ -219,10 +215,7 @@ describe("branch safety monitor", () => {
       ui: { setWidget: () => {} },
     };
 
-    await onToolCall(
-      { toolCallId: "write-1", toolName: "write", input: { path: "src/foo.ts", content: "x" } },
-      ctx
-    );
+    await onToolCall({ toolCallId: "write-1", toolName: "write", input: { path: "src/foo.ts", content: "x" } }, ctx);
 
     await onToolResult(
       {
@@ -232,7 +225,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "done" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
 
     const writeRes = await onToolResult(
@@ -243,7 +236,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     const text = (writeRes.content as any[])
@@ -279,15 +272,12 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "hi" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
 
     expect(bashRes).toBeUndefined();
 
-    await onToolCall(
-      { toolCallId: "ng-2", toolName: "write", input: { path: "README.md", content: "x" } },
-      ctx
-    );
+    await onToolCall({ toolCallId: "ng-2", toolName: "write", input: { path: "README.md", content: "x" } }, ctx);
     const writeRes = await onToolResult(
       {
         toolCallId: "ng-2",
@@ -296,7 +286,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     if (writeRes) {
@@ -334,7 +324,7 @@ describe("branch safety monitor", () => {
         content: [{ type: "text", text: "hi" }],
         details: { exitCode: 0 },
       },
-      ctx
+      ctx,
     );
 
     const text = (res.content as any[])

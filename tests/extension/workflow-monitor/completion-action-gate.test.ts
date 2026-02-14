@@ -1,35 +1,28 @@
-import { describe, test, expect, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 import {
-  WORKFLOW_TRACKER_ENTRY_TYPE,
-  WORKFLOW_PHASES,
   type Phase,
   type PhaseStatus,
+  WORKFLOW_PHASES,
+  WORKFLOW_TRACKER_ENTRY_TYPE,
   type WorkflowTrackerState,
 } from "../../../extensions/workflow-monitor/workflow-tracker";
 import { createFakePi, getSingleHandler } from "./test-helpers";
 
 function createWorkflowState(
   overrides: Partial<Record<Phase, PhaseStatus>>,
-  currentPhase: Phase | null = null
+  currentPhase: Phase | null = null,
 ): WorkflowTrackerState {
-  const phases = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, overrides[p] ?? "pending"])
-  ) as Record<Phase, PhaseStatus>;
-  const artifacts = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, null])
-  ) as Record<Phase, string | null>;
-  const prompted = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, false])
-  ) as Record<Phase, boolean>;
+  const phases = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, overrides[p] ?? "pending"])) as Record<
+    Phase,
+    PhaseStatus
+  >;
+  const artifacts = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, null])) as Record<Phase, string | null>;
+  const prompted = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, false])) as Record<Phase, boolean>;
   return { phases, currentPhase, artifacts, prompted };
 }
 
-function createCtx(
-  state: WorkflowTrackerState,
-  hasUI: boolean,
-  selectResponses: string[] = []
-) {
+function createCtx(state: WorkflowTrackerState, hasUI: boolean, selectResponses: string[] = []) {
   let selectIdx = 0;
   const editorTexts: string[] = [];
   return {
@@ -77,7 +70,7 @@ describe("completion-action gating on bash commands", () => {
         review: "pending",
         finish: "pending",
       },
-      "brainstorm"
+      "brainstorm",
     );
 
     const { onSessionSwitch, onToolCall } = await setupExtension(state);
@@ -91,7 +84,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "git commit -m 'docs: brainstorm'" },
       },
-      ctx
+      ctx,
     );
 
     expect(ctx.ui.select).not.toHaveBeenCalled();
@@ -107,7 +100,7 @@ describe("completion-action gating on bash commands", () => {
         review: "pending",
         finish: "pending",
       },
-      "execute"
+      "execute",
     );
     const { fake, onSessionSwitch, onToolCall } = await setupExtension(state);
     const { ctx, editorTexts } = createCtx(state, true, ["Do verify now"]);
@@ -120,7 +113,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "git commit -m 'feat: done'" },
       },
-      ctx
+      ctx,
     );
 
     expect(ctx.ui.select).toHaveBeenCalled();
@@ -140,7 +133,7 @@ describe("completion-action gating on bash commands", () => {
         review: "pending",
         finish: "pending",
       },
-      "execute"
+      "execute",
     );
     const { fake, onSessionSwitch, onToolCall, onToolResult } = await setupExtension(state);
     const { ctx } = createCtx(state, true, ["Skip verify"]);
@@ -153,7 +146,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "git commit -m 'feat: done'" },
       },
-      ctx
+      ctx,
     );
 
     // Should NOT block
@@ -195,7 +188,7 @@ describe("completion-action gating on bash commands", () => {
         review: "pending",
         finish: "pending",
       },
-      "execute"
+      "execute",
     );
     const { fake, onSessionSwitch, onToolCall } = await setupExtension(state);
     const { ctx } = createCtx(state, true, ["Skip all and continue"]);
@@ -208,7 +201,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "git push origin main" },
       },
-      ctx
+      ctx,
     );
 
     expect(result?.blocked).not.toBe(true);
@@ -228,7 +221,7 @@ describe("completion-action gating on bash commands", () => {
         review: "pending",
         finish: "pending",
       },
-      "execute"
+      "execute",
     );
     const { fake, onSessionSwitch, onToolCall } = await setupExtension(state);
     const { ctx } = createCtx(state, true, ["Cancel"]);
@@ -241,7 +234,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "gh pr create --title 'feat'" },
       },
-      ctx
+      ctx,
     );
 
     expect(result).toEqual({ blocked: true });
@@ -257,7 +250,7 @@ describe("completion-action gating on bash commands", () => {
         review: "pending",
         finish: "pending",
       },
-      "execute"
+      "execute",
     );
     const { fake, onSessionSwitch, onToolCall, onToolResult } = await setupExtension(state);
     const { ctx } = createCtx(state, false);
@@ -270,7 +263,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "git commit -m 'feat: stuff'" },
       },
-      ctx
+      ctx,
     );
 
     // Should NOT prompt (no UI)
@@ -305,7 +298,7 @@ describe("completion-action gating on bash commands", () => {
         execute: "complete",
         verify: "pending",
       },
-      "execute"
+      "execute",
     );
     const { onSessionSwitch, onToolCall } = await setupExtension(state);
     const { ctx } = createCtx(state, true);
@@ -318,7 +311,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "ls -la" },
       },
-      ctx
+      ctx,
     );
 
     expect(ctx.ui.select).not.toHaveBeenCalled();
@@ -335,7 +328,7 @@ describe("completion-action gating on bash commands", () => {
         review: "complete",
         finish: "pending",
       },
-      "verify"
+      "verify",
     );
     const { onSessionSwitch, onToolCall } = await setupExtension(state);
     const { ctx } = createCtx(state, true);
@@ -348,7 +341,7 @@ describe("completion-action gating on bash commands", () => {
         toolName: "bash",
         input: { command: "git commit -m 'final'" },
       },
-      ctx
+      ctx,
     );
 
     expect(ctx.ui.select).not.toHaveBeenCalled();
@@ -365,7 +358,7 @@ describe("completion-action gating on bash commands", () => {
         review: "pending",
         finish: "pending",
       },
-      "execute"
+      "execute",
     );
 
     const { onSessionSwitch, onToolCall } = await setupExtension(state);
@@ -374,10 +367,7 @@ describe("completion-action gating on bash commands", () => {
 
     await onSessionSwitch({}, ctx);
 
-    await onToolCall(
-      { toolCallId: "tc1", toolName: "bash", input: { command: "git commit -m 'x'" } },
-      ctx
-    );
+    await onToolCall({ toolCallId: "tc1", toolName: "bash", input: { command: "git commit -m 'x'" } }, ctx);
 
     expect(ctx.ui.select).toHaveBeenCalledTimes(1);
     const [_title, options] = (ctx.ui.select as any).mock.calls[0];

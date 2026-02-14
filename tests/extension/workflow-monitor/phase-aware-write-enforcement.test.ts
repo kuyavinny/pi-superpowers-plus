@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 import { WORKFLOW_TRACKER_ENTRY_TYPE } from "../../../extensions/workflow-monitor/workflow-tracker";
 import { createFakePi, getSingleHandler } from "./test-helpers";
@@ -50,7 +50,7 @@ describe("phase-aware file write enforcement", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     const text = (res?.content ?? [])
@@ -108,7 +108,7 @@ describe("phase-aware file write enforcement", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     const text = (res?.content ?? [])
@@ -157,10 +157,7 @@ describe("phase-aware file write enforcement", () => {
 
     const plansPath = `${process.cwd()}/docs/plans/design.md`;
 
-    await onToolCall(
-      { toolCallId: "abs1", toolName: "write", input: { path: plansPath, content: "x" } },
-      ctx
-    );
+    await onToolCall({ toolCallId: "abs1", toolName: "write", input: { path: plansPath, content: "x" } }, ctx);
 
     const res = await onToolResult(
       {
@@ -170,7 +167,7 @@ describe("phase-aware file write enforcement", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     const text = (res?.content ?? [])
@@ -229,7 +226,7 @@ describe("phase-aware file write enforcement", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     const text = (res?.content ?? [])
@@ -256,7 +253,14 @@ describe("phase-aware file write enforcement", () => {
             type: "custom",
             customType: WORKFLOW_TRACKER_ENTRY_TYPE,
             data: {
-              phases: { brainstorm: "active", plan: "pending", execute: "pending", verify: "pending", review: "pending", finish: "pending" },
+              phases: {
+                brainstorm: "active",
+                plan: "pending",
+                execute: "pending",
+                verify: "pending",
+                review: "pending",
+                finish: "pending",
+              },
               currentPhase: "brainstorm",
               artifacts: { brainstorm: null, plan: null, execute: null, verify: null, review: null, finish: null },
               prompted: { brainstorm: false, plan: false, execute: false, verify: false, review: false, finish: false },
@@ -282,7 +286,10 @@ describe("phase-aware file write enforcement", () => {
     await onToolCall({ toolCallId: "w1", toolName: "write", input: { path: "extensions/a.ts", content: "x" } }, ctx);
 
     // 2nd violation: should block
-    const res = await onToolCall({ toolCallId: "w2", toolName: "write", input: { path: "extensions/b.ts", content: "y" } }, ctx);
+    const res = await onToolCall(
+      { toolCallId: "w2", toolName: "write", input: { path: "extensions/b.ts", content: "y" } },
+      ctx,
+    );
 
     expect(promptCount).toBe(1);
     expect(res).toEqual({ blocked: true });

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 
 type Handler = (event: any, ctx: any) => any;
@@ -65,7 +65,7 @@ describe("workflow-monitor extension lifecycle", () => {
         content: [{ type: "text", text: "ok" }],
         details: {},
       },
-      ctx
+      ctx,
     );
 
     if (result) {

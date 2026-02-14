@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { loadReference, REFERENCE_TOPICS } from "../../../extensions/workflow-monitor/reference-tool";
 
 describe("REFERENCE_TOPICS", () => {

@@ -1,8 +1,5 @@
-import { describe, test, expect, beforeEach } from "vitest";
-import {
-  createWorkflowHandler,
-  type WorkflowHandler,
-} from "../../../extensions/workflow-monitor/workflow-handler";
+import { beforeEach, describe, expect, test } from "vitest";
+import { createWorkflowHandler, type WorkflowHandler } from "../../../extensions/workflow-monitor/workflow-handler";
 import { computeBoundaryToPrompt } from "../../../extensions/workflow-monitor/workflow-tracker";
 
 describe("WorkflowHandler workflow-tracker integration", () => {

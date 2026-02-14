@@ -1,27 +1,24 @@
-import { describe, test, expect, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import workflowMonitorExtension from "../../../extensions/workflow-monitor";
 import {
-  WORKFLOW_TRACKER_ENTRY_TYPE,
-  WORKFLOW_PHASES,
   type Phase,
   type PhaseStatus,
+  WORKFLOW_PHASES,
+  WORKFLOW_TRACKER_ENTRY_TYPE,
   type WorkflowTrackerState,
 } from "../../../extensions/workflow-monitor/workflow-tracker";
 import { createFakePi, getSingleHandler } from "./test-helpers";
 
 function createWorkflowState(
   overrides: Partial<Record<Phase, PhaseStatus>>,
-  currentPhase: Phase | null = null
+  currentPhase: Phase | null = null,
 ): WorkflowTrackerState {
-  const phases = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, overrides[p] ?? "pending"])
-  ) as Record<Phase, PhaseStatus>;
-  const artifacts = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, null])
-  ) as Record<Phase, string | null>;
-  const prompted = Object.fromEntries(
-    WORKFLOW_PHASES.map((p) => [p, false])
-  ) as Record<Phase, boolean>;
+  const phases = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, overrides[p] ?? "pending"])) as Record<
+    Phase,
+    PhaseStatus
+  >;
+  const artifacts = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, null])) as Record<Phase, string | null>;
+  const prompted = Object.fromEntries(WORKFLOW_PHASES.map((p) => [p, false])) as Record<Phase, boolean>;
   return { phases, currentPhase, artifacts, prompted };
 }
 
@@ -38,7 +35,7 @@ function setupWithState(state: WorkflowTrackerState) {
 describe("skip-confirmation gating on /skill transitions", () => {
   test("non-interactive bypasses gate (no prompt shown)", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm")
+      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm"),
     );
 
     const ctx = {
@@ -69,7 +66,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("no gate when zero unresolved phases before target", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState({ brainstorm: "complete", plan: "complete" }, "plan")
+      createWorkflowState({ brainstorm: "complete", plan: "complete" }, "plan"),
     );
 
     const ctx = {
@@ -100,7 +97,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("skip-confirmation prompts with string labels (not {label,value} objects)", async () => {
     const { onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm")
+      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm"),
     );
 
     const ctx = {
@@ -133,7 +130,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("single unresolved + skip: skips phase and allows transition", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm")
+      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm"),
     );
 
     const editorTexts: string[] = [];
@@ -171,7 +168,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("single unresolved + do now: blocks transition, sets editor to missing phase skill", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm")
+      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm"),
     );
 
     const editorTexts: string[] = [];
@@ -212,7 +209,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("single unresolved + cancel: blocks transition", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm")
+      createWorkflowState({ brainstorm: "complete", plan: "pending" }, "brainstorm"),
     );
 
     const ctx = {
@@ -245,10 +242,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("multi unresolved + skip all: skips all and allows transition", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState(
-        { brainstorm: "pending", plan: "pending", execute: "pending" },
-        null
-      )
+      createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
     );
 
     const ctx = {
@@ -258,10 +252,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
           {
             type: "custom",
             customType: WORKFLOW_TRACKER_ENTRY_TYPE,
-            data: createWorkflowState(
-              { brainstorm: "pending", plan: "pending", execute: "pending" },
-              null
-            ),
+            data: createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
           },
         ],
       },
@@ -286,10 +277,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("multi unresolved + cancel: blocks transition", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState(
-        { brainstorm: "pending", plan: "pending", execute: "pending" },
-        null
-      )
+      createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
     );
 
     const ctx = {
@@ -299,10 +287,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
           {
             type: "custom",
             customType: WORKFLOW_TRACKER_ENTRY_TYPE,
-            data: createWorkflowState(
-              { brainstorm: "pending", plan: "pending", execute: "pending" },
-              null
-            ),
+            data: createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
           },
         ],
       },
@@ -323,10 +308,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("multi unresolved + review one-by-one: prompts each, skip individual", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState(
-        { brainstorm: "pending", plan: "pending", execute: "pending" },
-        null
-      )
+      createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
     );
 
     // First select: Review one-by-one, then Skip brainstorm, then Skip plan
@@ -340,10 +322,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
           {
             type: "custom",
             customType: WORKFLOW_TRACKER_ENTRY_TYPE,
-            data: createWorkflowState(
-              { brainstorm: "pending", plan: "pending", execute: "pending" },
-              null
-            ),
+            data: createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
           },
         ],
       },
@@ -369,10 +348,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("multi unresolved + review one-by-one + do_now on first: blocks transition", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState(
-        { brainstorm: "pending", plan: "pending", execute: "pending" },
-        null
-      )
+      createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
     );
 
     const editorTexts: string[] = [];
@@ -386,10 +362,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
           {
             type: "custom",
             customType: WORKFLOW_TRACKER_ENTRY_TYPE,
-            data: createWorkflowState(
-              { brainstorm: "pending", plan: "pending", execute: "pending" },
-              null
-            ),
+            data: createWorkflowState({ brainstorm: "pending", plan: "pending", execute: "pending" }, null),
           },
         ],
       },
@@ -412,7 +385,7 @@ describe("skip-confirmation gating on /skill transitions", () => {
 
   test("extension-sourced input events bypass gate", async () => {
     const { fake, onSessionSwitch, onInput } = setupWithState(
-      createWorkflowState({ brainstorm: "pending", plan: "pending" }, null)
+      createWorkflowState({ brainstorm: "pending", plan: "pending" }, null),
     );
 
     const ctx = {
@@ -472,7 +445,7 @@ describe("multiline /skill input: gate applies to furthest target phase", () => 
         source: "user",
         input: "/skill:writing-plans\nsome text\n/skill:verification-before-completion",
       },
-      ctx
+      ctx,
     );
 
     // Gate should have fired because plan and execute are unresolved before verify
@@ -574,7 +547,7 @@ describe("multiline /skill input: gate applies to furthest target phase", () => 
     // Input with XML skill that targets review phase — brainstorm/plan/execute/verify are unresolved
     await onInput(
       { source: "user", text: '<skill name="requesting-code-review" location="/path">\ncontent\n</skill>' },
-      ctx
+      ctx,
     );
 
     // The gate should have fired because there are unresolved phases before "review"
@@ -610,7 +583,7 @@ describe("multiline /skill input: gate applies to furthest target phase", () => 
         source: "user",
         input: "/skill:brainstorming\n/skill:executing-plans",
       },
-      ctx
+      ctx,
     );
 
     expect(ctx.ui.select).toHaveBeenCalled();

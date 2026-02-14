@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, test } from "vitest";
 import { DebugMonitor } from "../../../extensions/workflow-monitor/debug-monitor";
 
 describe("DebugMonitor", () => {
@@ -52,10 +52,10 @@ describe("DebugMonitor", () => {
   });
 
   test("increments fix attempts on source-write then test-fail cycle", () => {
-    monitor.onTestFailed();         // initial failure
+    monitor.onTestFailed(); // initial failure
     monitor.onInvestigation();
     monitor.onSourceWritten("src/foo.ts");
-    monitor.onTestFailed();         // fix attempt failed
+    monitor.onTestFailed(); // fix attempt failed
     expect(monitor.getFixAttempts()).toBe(1);
   });
 

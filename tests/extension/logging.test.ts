@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // We'll test the internal createLogger factory, not the singleton,
 // so each test gets its own log file in a temp dir.
@@ -91,7 +91,7 @@ describe("logging", () => {
     log.info("after rotation");
 
     // Old content should be in .1 file
-    const rotated = logPath + ".1";
+    const rotated = `${logPath}.1`;
     expect(fs.existsSync(rotated)).toBe(true);
     expect(fs.readFileSync(rotated, "utf-8")).toBe("x".repeat(200));
 

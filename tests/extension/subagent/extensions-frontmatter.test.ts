@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { discoverAgents } from "../../../extensions/subagent/agents";
 
 describe("agent frontmatter extensions", () => {

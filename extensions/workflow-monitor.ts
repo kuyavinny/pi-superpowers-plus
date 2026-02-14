@@ -9,39 +9,39 @@
  */
 
 import * as path from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import { createWorkflowHandler, type Violation } from "./workflow-monitor/workflow-handler";
-import { type VerificationViolation } from "./workflow-monitor/verification-monitor";
-import { getTddViolationWarning } from "./workflow-monitor/warnings";
-import {
-  getDebugViolationWarning,
-  getVerificationViolationWarning,
-  type DebugViolationType,
-} from "./workflow-monitor/warnings";
+import { Type } from "@sinclair/typebox";
+import { getCurrentGitRef } from "./workflow-monitor/git";
 import { loadReference, REFERENCE_TOPICS } from "./workflow-monitor/reference-tool";
+import { getUnresolvedPhases, getUnresolvedPhasesBefore } from "./workflow-monitor/skip-confirmation";
 import { parseTestCommand, parseTestResult } from "./workflow-monitor/test-runner";
+import type { VerificationViolation } from "./workflow-monitor/verification-monitor";
 import {
+  type DebugViolationType,
+  getDebugViolationWarning,
+  getTddViolationWarning,
+  getVerificationViolationWarning,
+} from "./workflow-monitor/warnings";
+import { createWorkflowHandler, type Violation } from "./workflow-monitor/workflow-handler";
+import {
+  computeBoundaryToPrompt,
+  type Phase,
+  parseSkillName,
+  type TransitionBoundary,
   WORKFLOW_PHASES,
   WORKFLOW_TRACKER_ENTRY_TYPE,
-  computeBoundaryToPrompt,
-  parseSkillName,
-  type Phase,
-  type TransitionBoundary,
   type WorkflowTrackerState,
 } from "./workflow-monitor/workflow-tracker";
 import { getTransitionPrompt } from "./workflow-monitor/workflow-transitions";
-import { getCurrentGitRef } from "./workflow-monitor/git";
-import { getUnresolvedPhasesBefore, getUnresolvedPhases } from "./workflow-monitor/skip-confirmation";
 
 type SelectOption<T extends string> = { label: string; value: T };
 
 async function selectValue<T extends string>(
   ctx: ExtensionContext,
   title: string,
-  options: SelectOption<T>[]
+  options: SelectOption<T>[],
 ): Promise<T> {
   const labels = options.map((o) => o.label);
   const pickedLabel = await ctx.ui.select(title, labels);
@@ -63,10 +63,7 @@ export default function (pi: ExtensionAPI) {
   const strikes: Record<ViolationBucket, number> = { process: 0, practice: 0 };
   const sessionAllowed: Partial<Record<ViolationBucket, boolean>> = {};
 
-  async function maybeEscalate(
-    bucket: ViolationBucket,
-    ctx: ExtensionContext
-  ): Promise<"allow" | "block"> {
+  async function maybeEscalate(bucket: ViolationBucket, ctx: ExtensionContext): Promise<"allow" | "block"> {
     if (!ctx.hasUI) return "allow";
     if (sessionAllowed[bucket]) return "allow";
 
@@ -75,7 +72,7 @@ export default function (pi: ExtensionAPI) {
 
     const choice = await ctx.ui.select(
       `The agent has repeatedly violated ${bucket} guardrails. Allow it to continue?`,
-      ["Yes, continue", "Yes, allow all for this session", "No, stop"]
+      ["Yes, continue", "Yes, allow all for this session", "No, stop"],
     );
 
     if (choice === "Yes, continue") {
@@ -146,12 +143,7 @@ export default function (pi: ExtensionAPI) {
   };
 
   // --- State reconstruction on session events ---
-  for (const event of [
-    "session_start",
-    "session_switch",
-    "session_fork",
-    "session_tree",
-  ] as const) {
+  for (const event of ["session_start", "session_switch", "session_fork", "session_tree"] as const) {
     pi.on(event, async (_event, ctx) => {
       handler.resetState();
       handler.restoreWorkflowStateFromBranch(ctx.sessionManager.getBranch());
@@ -172,10 +164,7 @@ export default function (pi: ExtensionAPI) {
   // --- Input observation (skill detection + skip-confirmation gate) ---
   pi.on("input", async (event, ctx) => {
     if (event.source === "extension") return;
-    const text =
-      (event.text as string | undefined) ??
-      (event.input as string | undefined) ??
-      "";
+    const text = (event.text as string | undefined) ?? (event.input as string | undefined) ?? "";
 
     const targetPhase = parseTargetPhase(text);
 
@@ -239,7 +228,11 @@ export default function (pi: ExtensionAPI) {
       { label: "Skip all and continue", value: "skip_all" as const },
       { label: "Cancel", value: "cancel" as const },
     ];
-    const summaryChoice = await selectValue(ctx, `${unresolved.length} phases are unresolved: ${unresolved.join(", ")}. What would you like to do?`, summaryOptions);
+    const summaryChoice = await selectValue(
+      ctx,
+      `${unresolved.length} phases are unresolved: ${unresolved.join(", ")}. What would you like to do?`,
+      summaryOptions,
+    );
 
     if (summaryChoice === "skip_all") {
       handler.skipWorkflowPhases(unresolved);
@@ -281,10 +274,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // --- Completion action gate prompt ---
-  async function promptCompletionGate(
-    unresolved: Phase[],
-    ctx: any
-  ): Promise<"allowed" | "blocked"> {
+  async function promptCompletionGate(unresolved: Phase[], ctx: any): Promise<"allowed" | "blocked"> {
     if (unresolved.length === 1) {
       const missing = unresolved[0];
       const missingSkill = phaseToSkill[missing] ?? missing;
@@ -314,7 +304,11 @@ export default function (pi: ExtensionAPI) {
       { label: "Skip all and continue", value: "skip_all" as const },
       { label: "Cancel", value: "cancel" as const },
     ];
-    const summaryChoice = await selectValue(ctx, `${unresolved.length} phases are unresolved: ${unresolved.join(", ")}. What would you like to do?`, summaryOptions);
+    const summaryChoice = await selectValue(
+      ctx,
+      `${unresolved.length} phases are unresolved: ${unresolved.join(", ")}. What would you like to do?`,
+      summaryOptions,
+    );
 
     if (summaryChoice === "skip_all") {
       handler.skipWorkflowPhases(unresolved);
@@ -450,7 +444,7 @@ export default function (pi: ExtensionAPI) {
           pendingProcessWarnings.set(
             toolCallId,
             `⚠️ PROCESS VIOLATION: Wrote ${filePath} during ${phase} phase.\n` +
-              "During brainstorming/planning you may only write to docs/plans/. Stop and return to docs/plans/ or advance workflow phases intentionally."
+              "During brainstorming/planning you may only write to docs/plans/. Stop and return to docs/plans/ or advance workflow phases intentionally.",
           );
         }
 
@@ -465,7 +459,7 @@ export default function (pi: ExtensionAPI) {
           pendingBranchGates.set(
             toolCallId,
             `⚠️ First write of this session. You're on branch \`${ref}\`.\n` +
-              "Confirm with the user this is the correct branch before continuing, or create a new branch/worktree."
+              "Confirm with the user this is the correct branch before continuing, or create a new branch/worktree.",
           );
         } else {
           // Not a git repo: disable branch messages silently.
@@ -490,7 +484,7 @@ export default function (pi: ExtensionAPI) {
 
     // Handle read tool as investigation signal
     if (event.toolName === "read") {
-      const path = (event.input as Record<string, any>).path as string ?? "";
+      const path = ((event.input as Record<string, any>).path as string) ?? "";
       handler.handleReadOrInvestigation("read", path);
     }
 
@@ -524,7 +518,7 @@ export default function (pi: ExtensionAPI) {
 
     // Handle bash results (test runs, commits, investigation)
     if (event.toolName === "bash") {
-      const command = (event.input as Record<string, any>).command as string ?? "";
+      const command = ((event.input as Record<string, any>).command as string) ?? "";
       const output = event.content
         .filter((c): c is { type: "text"; text: string } => c.type === "text")
         .map((c) => c.text)
@@ -545,9 +539,7 @@ export default function (pi: ExtensionAPI) {
 
       const verificationViolation = pendingVerificationViolations.get(toolCallId);
       if (verificationViolation) {
-        injected.push(
-          getVerificationViolationWarning(verificationViolation.type, verificationViolation.command)
-        );
+        injected.push(getVerificationViolationWarning(verificationViolation.type, verificationViolation.command));
       }
       pendingVerificationViolations.delete(toolCallId);
     }
@@ -604,13 +596,9 @@ export default function (pi: ExtensionAPI) {
       "- What was learned during this implementation? (surprises, codebase knowledge, things to do differently)\n\n";
 
     if (selected === "next") {
-      ctx.ui.setEditorText(
-        prompt.nextPhase === "finish" ? finishReminder + nextInSession : nextInSession
-      );
+      ctx.ui.setEditorText(prompt.nextPhase === "finish" ? finishReminder + nextInSession : nextInSession);
     } else if (selected === "fresh") {
-      ctx.ui.setEditorText(
-        prompt.nextPhase === "finish" ? finishReminder + fresh : fresh
-      );
+      ctx.ui.setEditorText(prompt.nextPhase === "finish" ? finishReminder + fresh : fresh);
     } else if (selected === "skip") {
       // Explicit user-confirmed skip: mark the next phase as skipped, then move on.
       handler.skipWorkflowPhases([prompt.nextPhase]);
@@ -640,7 +628,7 @@ export default function (pi: ExtensionAPI) {
     return getDebugViolationWarning(
       violation.type as DebugViolationType,
       violation.file,
-      "fixAttempts" in violation ? violation.fixAttempts : 0
+      "fixAttempts" in violation ? violation.fixAttempts : 0,
     );
   }
 
@@ -701,9 +689,7 @@ export default function (pi: ExtensionAPI) {
         }
       }
 
-      return parts.length > 0
-        ? new Text(parts.join(theme.fg("dim", "  |  ")), 0, 0)
-        : undefined;
+      return parts.length > 0 ? new Text(parts.join(theme.fg("dim", "  |  ")), 0, 0) : undefined;
     });
   }
 
@@ -718,7 +704,10 @@ export default function (pi: ExtensionAPI) {
       const [phase, artifact] = args.trim().split(/\s+/, 2);
       const validPhases = new Set(["brainstorm", "plan", "execute", "verify", "review", "finish"]);
       if (!phase || !validPhases.has(phase)) {
-        ctx.ui.notify("Usage: /workflow-next <phase> [artifact-path]  (phase: brainstorm|plan|execute|verify|review|finish)", "error");
+        ctx.ui.notify(
+          "Usage: /workflow-next <phase> [artifact-path]  (phase: brainstorm|plan|execute|verify|review|finish)",
+          "error",
+        );
         return;
       }
 
@@ -772,11 +761,7 @@ export default function (pi: ExtensionAPI) {
       const topic = (result.details as any)?.topic ?? "unknown";
       const content = result.content[0];
       const len = content?.type === "text" ? content.text.length : 0;
-      return new Text(
-        theme.fg("success", "✓ ") + theme.fg("muted", `${topic} (${len} chars)`),
-        0,
-        0
-      );
+      return new Text(theme.fg("success", "✓ ") + theme.fg("muted", `${topic} (${len} chars)`), 0, 0);
     },
   });
 }
