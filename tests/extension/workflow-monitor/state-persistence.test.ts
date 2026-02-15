@@ -1,11 +1,16 @@
 import { describe, expect, test } from "vitest";
+import workflowMonitorExtension, { reconstructState } from "../../../extensions/workflow-monitor";
 import { DebugMonitor } from "../../../extensions/workflow-monitor/debug-monitor";
-import { VerificationMonitor } from "../../../extensions/workflow-monitor/verification-monitor";
 import {
   createWorkflowHandler,
+  DEBUG_DEFAULTS,
+  TDD_DEFAULTS,
+  VERIFICATION_DEFAULTS,
   type SuperpowersStateSnapshot,
 } from "../../../extensions/workflow-monitor/workflow-handler";
-import { WorkflowTracker } from "../../../extensions/workflow-monitor/workflow-tracker";
+import { VerificationMonitor } from "../../../extensions/workflow-monitor/verification-monitor";
+import { WORKFLOW_TRACKER_ENTRY_TYPE, WorkflowTracker } from "../../../extensions/workflow-monitor/workflow-tracker";
+import { createFakePi, getSingleHandler } from "./test-helpers";
 
 describe("DebugMonitor state persistence", () => {
   test("getState returns serializable monitor state", () => {
@@ -262,5 +267,198 @@ describe("WorkflowHandler aggregated state persistence", () => {
         verificationWaived: false,
       },
     });
+  });
+});
+
+describe("workflow-monitor state reconstruction + persistence wiring", () => {
+  test("reconstructs full state from superpowers_state entry", () => {
+    const handler = createWorkflowHandler();
+    const snapshot: SuperpowersStateSnapshot = {
+      workflow: {
+        phases: {
+          brainstorm: "complete",
+          plan: "active",
+          execute: "pending",
+          verify: "pending",
+          review: "pending",
+          finish: "pending",
+        },
+        currentPhase: "plan",
+        artifacts: {
+          brainstorm: "docs/plans/2026-02-15-feature-design.md",
+          plan: null,
+          execute: null,
+          verify: null,
+          review: null,
+          finish: null,
+        },
+        prompted: {
+          brainstorm: true,
+          plan: false,
+          execute: false,
+          verify: false,
+          review: false,
+          finish: false,
+        },
+      },
+      tdd: {
+        phase: "green",
+        testFiles: ["tests/x.test.ts"],
+        sourceFiles: ["src/x.ts"],
+        redVerificationPending: false,
+      },
+      debug: { active: true, investigated: true, fixAttempts: 2 },
+      verification: { verified: false, verificationWaived: true },
+    };
+
+    reconstructState(
+      {
+        sessionManager: {
+          getBranch: () => [{ type: "custom", customType: "superpowers_state", data: snapshot }],
+        },
+      } as any,
+      handler,
+    );
+
+    expect(handler.getFullState()).toEqual(snapshot);
+  });
+
+  test("reconstructs workflow from legacy workflow_tracker_state entry and defaults other monitors", () => {
+    const handler = createWorkflowHandler();
+    const workflow = new WorkflowTracker().getState();
+    workflow.currentPhase = "execute";
+    workflow.phases.brainstorm = "complete";
+    workflow.phases.plan = "complete";
+    workflow.phases.execute = "active";
+
+    reconstructState(
+      {
+        sessionManager: {
+          getBranch: () => [{ type: "custom", customType: WORKFLOW_TRACKER_ENTRY_TYPE, data: workflow }],
+        },
+      } as any,
+      handler,
+    );
+
+    expect(handler.getFullState()).toEqual({
+      workflow,
+      tdd: { ...TDD_DEFAULTS, testFiles: [], sourceFiles: [] },
+      debug: { ...DEBUG_DEFAULTS },
+      verification: { ...VERIFICATION_DEFAULTS },
+    });
+  });
+
+  test("reconstructs fresh defaults when branch has no persisted state entries", () => {
+    const handler = createWorkflowHandler();
+    handler.handleInputText("/skill:writing-plans");
+    handler.restoreTddState("green", ["tests/a.test.ts"], ["src/a.ts"], false);
+    handler.recordVerificationWaiver();
+
+    reconstructState(
+      {
+        sessionManager: {
+          getBranch: () => [],
+        },
+      } as any,
+      handler,
+    );
+
+    expect(handler.getFullState()).toEqual({
+      workflow: new WorkflowTracker().getState(),
+      tdd: { ...TDD_DEFAULTS, testFiles: [], sourceFiles: [] },
+      debug: { ...DEBUG_DEFAULTS },
+      verification: { ...VERIFICATION_DEFAULTS },
+    });
+  });
+
+  test("reconstructs using the last matching persisted state entry", () => {
+    const handler = createWorkflowHandler();
+
+    const older: SuperpowersStateSnapshot = {
+      workflow: {
+        phases: {
+          brainstorm: "active",
+          plan: "pending",
+          execute: "pending",
+          verify: "pending",
+          review: "pending",
+          finish: "pending",
+        },
+        currentPhase: "brainstorm",
+        artifacts: { brainstorm: null, plan: null, execute: null, verify: null, review: null, finish: null },
+        prompted: { brainstorm: false, plan: false, execute: false, verify: false, review: false, finish: false },
+      },
+      tdd: { phase: "red", testFiles: ["tests/old.test.ts"], sourceFiles: [], redVerificationPending: false },
+      debug: { active: false, investigated: false, fixAttempts: 0 },
+      verification: { verified: false, verificationWaived: false },
+    };
+
+    const newer: SuperpowersStateSnapshot = {
+      workflow: {
+        phases: {
+          brainstorm: "complete",
+          plan: "active",
+          execute: "pending",
+          verify: "pending",
+          review: "pending",
+          finish: "pending",
+        },
+        currentPhase: "plan",
+        artifacts: {
+          brainstorm: "docs/plans/new-design.md",
+          plan: null,
+          execute: null,
+          verify: null,
+          review: null,
+          finish: null,
+        },
+        prompted: { brainstorm: true, plan: false, execute: false, verify: false, review: false, finish: false },
+      },
+      tdd: {
+        phase: "green",
+        testFiles: ["tests/new.test.ts"],
+        sourceFiles: ["src/new.ts"],
+        redVerificationPending: false,
+      },
+      debug: { active: true, investigated: true, fixAttempts: 1 },
+      verification: { verified: true, verificationWaived: false },
+    };
+
+    reconstructState(
+      {
+        sessionManager: {
+          getBranch: () => [
+            { type: "custom", customType: "superpowers_state", data: older },
+            { type: "custom", customType: WORKFLOW_TRACKER_ENTRY_TYPE, data: new WorkflowTracker().getState() },
+            { type: "custom", customType: "superpowers_state", data: newer },
+          ],
+        },
+      } as any,
+      handler,
+    );
+
+    expect(handler.getFullState()).toEqual(newer);
+  });
+
+  test("persists when a skill file is read via read tool result", async () => {
+    const fake = createFakePi({ withAppendEntry: true });
+    workflowMonitorExtension(fake.api as any);
+
+    const onToolResult = getSingleHandler(fake.handlers, "tool_result");
+
+    await onToolResult(
+      {
+        toolCallId: "call-1",
+        toolName: "read",
+        input: { path: "/home/pi/workspace/pi-superpowers-plus/skills/writing-plans/SKILL.md" },
+        content: [{ type: "text", text: "ok" }],
+        details: {},
+      },
+      { hasUI: false, sessionManager: { getBranch: () => [] }, ui: { setWidget: () => {} } },
+    );
+
+    expect(fake.appendedEntries.length).toBe(1);
+    expect(fake.appendedEntries[0]?.customType).toBe("superpowers_state");
+    expect(fake.appendedEntries[0]?.data.workflow.currentPhase).toBe("plan");
   });
 });
