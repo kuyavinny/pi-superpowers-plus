@@ -386,7 +386,7 @@ pi-superpowers-plus/
 │   ├── dispatching-parallel-agents/
 │   ├── using-git-worktrees/
 │   └── finishing-a-development-branch/
-└── tests/                            # 274 tests across 35 files
+└── tests/                            # 338 tests across 37 files
 ```
 
 ## Development

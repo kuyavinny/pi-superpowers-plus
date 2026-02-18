@@ -131,9 +131,14 @@ The "mature package" release. Fill testing gaps, address known skill blindspots,
 
 **[maintainer]** The main `workflow-monitor.ts` (782 lines) handles event routing, widget rendering, workflow commands, escalation, git checks, and state management in one closure. Continue extracting into the `workflow-monitor/` subdirectory — the pattern already exists with 13 extracted modules. Not changing behavior, just improving maintainability. The logging from v0.2.0 makes this safer since refactored code can be verified against the same decision trail.
 
-### Skill Blindspot Sweep
+### Skill Blindspot Sweep (in progress)
 
 **[maintainer]** Work through the Tier 1 and Tier 2 items from `docs/plans/2026-02-10-skill-blindspot-analysis.md`. Gaps in skill coverage and enforcement — missing edge cases in phase transitions, incomplete heuristics in the TDD monitor, etc. Batch as a sweep after the refactor makes the code easier to change.
+
+**Completed (v0.3.0):**
+- SDD orchestrator boundary enforcement (never code directly, re-dispatch or escalate)
+- User checkpoint before final review/finishing phase
+- Read-only boundaries on code-reviewer and spec-reviewer prompts
 
 ---
 
