@@ -153,4 +153,22 @@ describe("subagent/index error handling", () => {
   test("exports inactivity timeout constant", () => {
     expect(INACTIVITY_TIMEOUT_MS).toBe(120_000);
   });
+
+  test("returns error when cwd does not exist", async () => {
+    const tool = registerTool();
+    const result = await tool.execute(
+      "id",
+      { agent: "test-agent", task: "do work", cwd: "/nonexistent/path/that/does/not/exist" },
+      undefined,
+      undefined,
+      {
+        cwd: process.cwd(),
+        hasUI: false,
+      },
+    );
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain("cwd does not exist");
+    expect(result.content[0].text).toContain("/nonexistent/path/that/does/not/exist");
+  });
 });

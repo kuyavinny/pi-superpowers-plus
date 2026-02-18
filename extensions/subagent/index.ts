@@ -22,6 +22,7 @@ import { StringEnum } from "@mariozechner/pi-ai";
 import { type ExtensionAPI, getMarkdownTheme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { buildSubagentEnv } from "./env.js";
 import { log } from "../logging.js";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
 
@@ -327,14 +328,30 @@ async function runSingleAgent(
     }
 
     args.push(`Task: ${task}`);
+
+    const resolvedCwd = path.resolve(cwd ?? defaultCwd);
+    if (!fs.existsSync(resolvedCwd)) {
+      return {
+        agent: agentName,
+        agentSource: agent.source,
+        task,
+        exitCode: 1,
+        messages: [],
+        stderr: `Subagent cwd does not exist: ${resolvedCwd}`,
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+        step,
+        errorMessage: `Subagent cwd does not exist: ${resolvedCwd}`,
+      };
+    }
+
     let wasAborted = false;
 
     const exitCode = await new Promise<number>((resolve) => {
       const proc = spawn("pi", args, {
-        cwd: cwd ?? defaultCwd,
+        cwd: resolvedCwd,
         shell: false,
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, PI_TDD_GUARD_VIOLATIONS_FILE: tddViolationsPath },
+        env: buildSubagentEnv(tddViolationsPath ? { PI_TDD_GUARD_VIOLATIONS_FILE: tddViolationsPath } : undefined),
       });
       let buffer = "";
       let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
