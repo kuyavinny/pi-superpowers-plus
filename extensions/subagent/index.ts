@@ -322,6 +322,9 @@ async function runSingleAgent(
     }
   };
 
+  if (semaphore.active >= semaphore.limit) {
+    log.debug(`Subagent queued — ${semaphore.active}/${semaphore.limit} slots in use`);
+  }
   const release = await semaphore.acquire();
   try {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-"));
@@ -335,17 +338,24 @@ async function runSingleAgent(
     args.push(`Task: ${task}`);
 
     const resolvedCwd = path.resolve(cwd ?? defaultCwd);
-    if (!fs.existsSync(resolvedCwd)) {
+    let cwdError: string | undefined;
+    try {
+      const stat = fs.statSync(resolvedCwd);
+      if (!stat.isDirectory()) cwdError = `Subagent cwd is not a directory: ${resolvedCwd}`;
+    } catch {
+      cwdError = `Subagent cwd does not exist: ${resolvedCwd}`;
+    }
+    if (cwdError) {
       return {
         agent: agentName,
         agentSource: agent.source,
         task,
         exitCode: 1,
         messages: [],
-        stderr: `Subagent cwd does not exist: ${resolvedCwd}`,
+        stderr: cwdError,
         usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
         step,
-        errorMessage: `Subagent cwd does not exist: ${resolvedCwd}`,
+        errorMessage: cwdError,
       };
     }
 
@@ -423,7 +433,11 @@ async function runSingleAgent(
           if (buffer.trim()) processLine(buffer);
           proc.kill("SIGTERM");
           setTimeout(() => {
-            if (!proc.killed) proc.kill("SIGKILL");
+            try {
+              proc.kill("SIGKILL");
+            } catch {
+              /* already exited */
+            }
           }, 5000);
           resolveOnce(1);
         }, INACTIVITY_TIMEOUT_MS);
@@ -441,7 +455,11 @@ async function runSingleAgent(
         if (buffer.trim()) processLine(buffer);
         proc.kill("SIGTERM");
         setTimeout(() => {
-          if (!proc.killed) proc.kill("SIGKILL");
+          try {
+            proc.kill("SIGKILL");
+          } catch {
+            /* already exited */
+          }
         }, 5000);
         resolveOnce(1);
       }, absoluteTimeoutMs);
@@ -480,7 +498,11 @@ async function runSingleAgent(
           wasAborted = true;
           proc.kill("SIGTERM");
           setTimeout(() => {
-            if (!proc.killed) proc.kill("SIGKILL");
+            try {
+              proc.kill("SIGKILL");
+            } catch {
+              /* already exited */
+            }
           }, 5000);
         };
         if (signal.aborted) killProc();

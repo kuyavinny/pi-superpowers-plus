@@ -78,7 +78,7 @@ describe("buildSubagentEnv", () => {
     expect(env.XDG_CONFIG_HOME).toBe("/home/user/.config");
   });
 
-  test("excludes common secret vars", () => {
+  test("excludes common secret vars including LANG-prefixed API keys", () => {
     process.env.AWS_SECRET_ACCESS_KEY = "secret123";
     process.env.AWS_ACCESS_KEY_ID = "key123";
     process.env.DATABASE_URL = "postgres://secret";
@@ -86,6 +86,8 @@ describe("buildSubagentEnv", () => {
     process.env.OPENAI_API_KEY = "sk-xxx";
     process.env.ANTHROPIC_API_KEY = "sk-ant-xxx";
     process.env.STRIPE_SECRET_KEY = "sk_live_xxx";
+    process.env.LANGCHAIN_API_KEY = "lc-xxx";
+    process.env.LANGSMITH_API_KEY = "ls-xxx";
     const env = buildSubagentEnv();
     expect(env.AWS_SECRET_ACCESS_KEY).toBeUndefined();
     expect(env.AWS_ACCESS_KEY_ID).toBeUndefined();
@@ -94,6 +96,8 @@ describe("buildSubagentEnv", () => {
     expect(env.OPENAI_API_KEY).toBeUndefined();
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
     expect(env.STRIPE_SECRET_KEY).toBeUndefined();
+    expect(env.LANGCHAIN_API_KEY).toBeUndefined();
+    expect(env.LANGSMITH_API_KEY).toBeUndefined();
   });
 
   test("passthrough via PI_SUBAGENT_ENV_PASSTHROUGH", () => {

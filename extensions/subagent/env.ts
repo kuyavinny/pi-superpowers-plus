@@ -1,4 +1,4 @@
-const ALLOWED_PREFIXES = ["PI_", "NODE_", "NPM_", "NVM_", "LANG", "LC_", "XDG_"];
+const ALLOWED_PREFIXES = ["PI_", "NODE_", "NPM_", "NVM_", "LC_", "XDG_"];
 
 const ALLOWED_EXPLICIT = new Set([
   "PATH",
@@ -14,6 +14,8 @@ const ALLOWED_EXPLICIT = new Set([
   "COLORTERM",
   "FORCE_COLOR",
   "NO_COLOR",
+  "LANG",
+  "LANGUAGE",
 ]);
 
 export function buildSubagentEnv(extra?: Record<string, string>): Record<string, string | undefined> {

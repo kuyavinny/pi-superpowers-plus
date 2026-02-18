@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createMockLogger } from "../../helpers/mock-logger.js";
 import * as logging from "../../../extensions/logging.js";
@@ -226,6 +227,70 @@ describe("subagent/index error handling", () => {
 
     process.env.PI_SUBAGENT_TIMEOUT_MS = originalTimeout;
     vi.useRealTimers();
+  });
+
+  test("escalates to SIGKILL when process does not exit after SIGTERM timeout", async () => {
+    vi.useFakeTimers();
+    const originalTimeout = process.env.PI_SUBAGENT_TIMEOUT_MS;
+    process.env.PI_SUBAGENT_TIMEOUT_MS = "10000"; // 10s
+
+    const proc = createFakeProcess();
+    // Realistic kill: sets proc.killed = true like Node.js does
+    const killCalls: string[] = [];
+    proc.kill = vi.fn((sig: string) => {
+      killCalls.push(sig);
+      proc.killed = true; // Node.js sets this after ANY signal
+      return true;
+    });
+    spawnMock.mockReturnValue(proc);
+
+    const tool = registerTool();
+    const resultPromise = tool.execute("id", { agent: "test-agent", task: "do work" }, undefined, undefined, {
+      cwd: process.cwd(),
+      hasUI: false,
+    });
+
+    // Advance past absolute timeout (10s)
+    await vi.advanceTimersByTimeAsync(11_000);
+    // Advance past SIGKILL grace period (5s)
+    await vi.advanceTimersByTimeAsync(6_000);
+
+    // Manually emit exit so the promise resolves
+    proc.emit("exit", 1);
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    await resultPromise;
+    expect(killCalls).toContain("SIGTERM");
+    expect(killCalls).toContain("SIGKILL");
+
+    process.env.PI_SUBAGENT_TIMEOUT_MS = originalTimeout;
+    vi.useRealTimers();
+  });
+
+  test("returns error when cwd is a file not a directory", async () => {
+    // Create a temp file to use as cwd — use os.tmpdir to avoid mock interference
+    const os = await import("node:os");
+    const tmpFile = path.join(os.tmpdir(), `subagent-test-${Date.now()}.txt`);
+    const { writeFileSync, unlinkSync } = await import("node:fs");
+    writeFileSync(tmpFile, "hello");
+
+    try {
+      const tool = registerTool();
+      const result = await tool.execute(
+        "id",
+        { agent: "test-agent", task: "do work", cwd: tmpFile },
+        undefined,
+        undefined,
+        { cwd: process.cwd(), hasUI: false },
+      );
+
+      expect(spawnMock).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain("cwd is not a directory");
+    } finally {
+      try {
+        unlinkSync(tmpFile);
+      } catch {}
+    }
   });
 
   test("returns error when cwd does not exist", async () => {
