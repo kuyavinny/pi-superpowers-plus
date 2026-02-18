@@ -154,6 +154,54 @@ describe("subagent/index error handling", () => {
     expect(INACTIVITY_TIMEOUT_MS).toBe(120_000);
   });
 
+  test("respects concurrency cap for parallel tasks", async () => {
+    // Set concurrency to 1 to verify serialization
+    const originalConcurrency = process.env.PI_SUBAGENT_CONCURRENCY;
+    process.env.PI_SUBAGENT_CONCURRENCY = "1";
+
+    let activeSpawns = 0;
+    let maxActiveSpawns = 0;
+
+    spawnMock.mockImplementation(() => {
+      activeSpawns++;
+      maxActiveSpawns = Math.max(maxActiveSpawns, activeSpawns);
+      const proc = createFakeProcess();
+      queueMicrotask(() => {
+        activeSpawns--;
+        proc.emit("exit", 0);
+      });
+      return proc;
+    });
+
+    // Re-register agent with two-agent list
+    discoverAgentsMock.mockReturnValue({
+      agents: [
+        { name: "agent-a", source: "user", filePath: "/tmp/a.md", systemPrompt: "" },
+        { name: "agent-b", source: "user", filePath: "/tmp/b.md", systemPrompt: "" },
+      ],
+      projectAgentsDir: null,
+    });
+
+    const tool = registerTool();
+    await tool.execute(
+      "id",
+      {
+        tasks: [
+          { agent: "agent-a", task: "task 1" },
+          { agent: "agent-b", task: "task 2" },
+        ],
+      },
+      undefined,
+      undefined,
+      { cwd: process.cwd(), hasUI: false },
+    );
+
+    // With concurrency cap of 1, max active spawns should be 1
+    expect(maxActiveSpawns).toBe(1);
+
+    process.env.PI_SUBAGENT_CONCURRENCY = originalConcurrency;
+  });
+
   test("kills subagent after absolute timeout", async () => {
     vi.useFakeTimers();
     // Set absolute timeout shorter than inactivity timeout (120s)

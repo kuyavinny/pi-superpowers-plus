@@ -23,12 +23,13 @@ import { type ExtensionAPI, getMarkdownTheme } from "@mariozechner/pi-coding-age
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { buildSubagentEnv } from "./env.js";
+import { Semaphore, getSubagentConcurrency } from "./concurrency.js";
+import { ProcessTracker } from "./lifecycle.js";
 import { getSubagentTimeoutMs } from "./timeout.js";
 import { log } from "../logging.js";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
 
 const MAX_PARALLEL_TASKS = 8;
-const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
 export const INACTIVITY_TIMEOUT_MS = 120_000;
 
@@ -267,6 +268,8 @@ async function runSingleAgent(
   signal: AbortSignal | undefined,
   onUpdate: OnUpdateCallback | undefined,
   makeDetails: (results: SingleResult[]) => SubagentDetails,
+  processTracker: ProcessTracker,
+  semaphore: Semaphore,
 ): Promise<SingleResult> {
   const agent = agents.find((a) => a.name === agentName);
 
@@ -319,6 +322,7 @@ async function runSingleAgent(
     }
   };
 
+  const release = await semaphore.acquire();
   try {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-"));
     tddViolationsPath = path.join(tmpDir, "tdd-violations.txt");
@@ -354,6 +358,7 @@ async function runSingleAgent(
         stdio: ["ignore", "pipe", "pipe"],
         env: buildSubagentEnv(tddViolationsPath ? { PI_TDD_GUARD_VIOLATIONS_FILE: tddViolationsPath } : undefined),
       });
+      processTracker.add(proc);
       let buffer = "";
       let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
       let absoluteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -453,6 +458,7 @@ async function runSingleAgent(
       });
 
       proc.on("exit", (code) => {
+        processTracker.remove(proc);
         if (exitResolved) return;
         if (inactivityTimer) clearTimeout(inactivityTimer);
         // Wait for any remaining stdout data to arrive after process exit, then drain.
@@ -464,6 +470,7 @@ async function runSingleAgent(
       });
 
       proc.on("error", () => {
+        processTracker.remove(proc);
         if (inactivityTimer) clearTimeout(inactivityTimer);
         resolveOnce(1);
       });
@@ -491,6 +498,7 @@ async function runSingleAgent(
     if (wasAborted) throw new Error("Subagent was aborted");
     return currentResult;
   } finally {
+    release();
     if (tmpPromptPath)
       try {
         fs.unlinkSync(tmpPromptPath);
@@ -538,6 +546,11 @@ const SubagentParams = Type.Object({
 });
 
 export default function (pi: ExtensionAPI) {
+  const processTracker = new ProcessTracker();
+  const semaphore = new Semaphore(getSubagentConcurrency());
+
+  process.on("exit", () => processTracker.killAll());
+
   pi.registerTool({
     name: "subagent",
     label: "Subagent",
@@ -640,6 +653,8 @@ export default function (pi: ExtensionAPI) {
             signal,
             chainUpdate,
             makeDetails("chain"),
+            processTracker,
+            semaphore,
           );
           results.push(result);
 
@@ -699,7 +714,7 @@ export default function (pi: ExtensionAPI) {
           }
         };
 
-        const results = await mapWithConcurrencyLimit(params.tasks, MAX_CONCURRENCY, async (t, index) => {
+        const results = await mapWithConcurrencyLimit(params.tasks, params.tasks.length, async (t, index) => {
           const result = await runSingleAgent(
             ctx.cwd,
             agents,
@@ -716,6 +731,8 @@ export default function (pi: ExtensionAPI) {
               }
             },
             makeDetails("parallel"),
+            processTracker,
+            semaphore,
           );
           allResults[index] = result;
           emitParallelUpdate();
@@ -750,6 +767,8 @@ export default function (pi: ExtensionAPI) {
           signal,
           onUpdate,
           makeDetails("single"),
+          processTracker,
+          semaphore,
         );
         const summary = collectSummary(result.messages);
         const stableDetails = {
