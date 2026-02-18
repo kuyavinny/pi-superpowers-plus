@@ -15,8 +15,12 @@ export class Semaphore {
 
   constructor(private limit: number) {}
 
-  get active(): number { return this._active; }
-  get waiting(): number { return this._queue.length; }
+  get active(): number {
+    return this._active;
+  }
+  get waiting(): number {
+    return this._queue.length;
+  }
 
   async acquire(): Promise<() => void> {
     if (this._active < this.limit) {

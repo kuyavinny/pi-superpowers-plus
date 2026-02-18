@@ -1,13 +1,22 @@
 const ALLOWED_PREFIXES = ["PI_", "NODE_", "NPM_", "NVM_", "LANG", "LC_", "XDG_"];
 
 const ALLOWED_EXPLICIT = new Set([
-  "PATH", "HOME", "SHELL", "TERM", "USER", "LOGNAME", "TMPDIR",
-  "EDITOR", "VISUAL", "SSH_AUTH_SOCK", "COLORTERM", "FORCE_COLOR", "NO_COLOR",
+  "PATH",
+  "HOME",
+  "SHELL",
+  "TERM",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "EDITOR",
+  "VISUAL",
+  "SSH_AUTH_SOCK",
+  "COLORTERM",
+  "FORCE_COLOR",
+  "NO_COLOR",
 ]);
 
-export function buildSubagentEnv(
-  extra?: Record<string, string>,
-): Record<string, string | undefined> {
+export function buildSubagentEnv(extra?: Record<string, string>): Record<string, string | undefined> {
   const filtered: Record<string, string | undefined> = {};
 
   for (const [key, value] of Object.entries(process.env)) {
@@ -19,7 +28,10 @@ export function buildSubagentEnv(
 
   const passthrough = process.env.PI_SUBAGENT_ENV_PASSTHROUGH;
   if (passthrough) {
-    for (const name of passthrough.split(",").map((s) => s.trim()).filter(Boolean)) {
+    for (const name of passthrough
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)) {
       const val = process.env[name];
       if (val !== undefined) filtered[name] = val;
     }

@@ -22,12 +22,12 @@ import { StringEnum } from "@mariozechner/pi-ai";
 import { type ExtensionAPI, getMarkdownTheme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { buildSubagentEnv } from "./env.js";
-import { Semaphore, getSubagentConcurrency } from "./concurrency.js";
-import { ProcessTracker } from "./lifecycle.js";
-import { getSubagentTimeoutMs } from "./timeout.js";
 import { log } from "../logging.js";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
+import { getSubagentConcurrency, Semaphore } from "./concurrency.js";
+import { buildSubagentEnv } from "./env.js";
+import { ProcessTracker } from "./lifecycle.js";
+import { getSubagentTimeoutMs } from "./timeout.js";
 
 const MAX_PARALLEL_TASKS = 8;
 const COLLAPSED_ITEM_COUNT = 10;

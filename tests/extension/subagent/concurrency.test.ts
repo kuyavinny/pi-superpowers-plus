@@ -1,5 +1,9 @@
 import { describe, expect, test, beforeEach, afterEach } from "vitest";
-import { Semaphore, getSubagentConcurrency, DEFAULT_SUBAGENT_CONCURRENCY } from "../../../extensions/subagent/concurrency.js";
+import {
+  Semaphore,
+  getSubagentConcurrency,
+  DEFAULT_SUBAGENT_CONCURRENCY,
+} from "../../../extensions/subagent/concurrency.js";
 
 describe("getSubagentConcurrency", () => {
   const originalEnv = process.env;
@@ -74,8 +78,14 @@ describe("Semaphore", () => {
 
     const release1 = await sem.acquire();
 
-    const p2 = sem.acquire().then((r) => { order.push(2); return r; });
-    const p3 = sem.acquire().then((r) => { order.push(3); return r; });
+    const p2 = sem.acquire().then((r) => {
+      order.push(2);
+      return r;
+    });
+    const p3 = sem.acquire().then((r) => {
+      order.push(3);
+      return r;
+    });
 
     release1();
     const r2 = await p2;

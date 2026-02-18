@@ -212,16 +212,10 @@ describe("subagent/index error handling", () => {
     spawnMock.mockReturnValue(proc);
 
     const tool = registerTool();
-    const resultPromise = tool.execute(
-      "id",
-      { agent: "test-agent", task: "do work" },
-      undefined,
-      undefined,
-      {
-        cwd: process.cwd(),
-        hasUI: false,
-      },
-    );
+    const resultPromise = tool.execute("id", { agent: "test-agent", task: "do work" }, undefined, undefined, {
+      cwd: process.cwd(),
+      hasUI: false,
+    });
 
     // Advance past the 30s absolute timeout but before 120s inactivity
     await vi.advanceTimersByTimeAsync(35_000);
