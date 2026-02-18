@@ -30,8 +30,12 @@ afterEach(() => {
   }
 });
 
+/**
+ * Creates a fake pi API for testing.
+ * NOTE: Changes process.cwd() to a temp directory to prevent state file
+ * pollution. CWD is restored in afterEach.
+ */
 export function createFakePi(extra?: { withAppendEntry?: boolean }) {
-  // Use temp CWD to avoid polluting the real project with state files
   withTempCwd();
 
   const handlers = new Map<string, Handler[]>();

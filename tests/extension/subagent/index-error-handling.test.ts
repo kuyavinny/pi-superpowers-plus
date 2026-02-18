@@ -145,7 +145,7 @@ describe("subagent/index error handling", () => {
           cwd: process.cwd(),
           hasUI: false,
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for execute")), 1000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for execute")), 3000)),
       ]),
     ).resolves.toBeDefined();
   });

@@ -420,11 +420,12 @@ async function runSingleAgent(
       proc.on("exit", (code) => {
         if (exitResolved) return;
         if (inactivityTimer) clearTimeout(inactivityTimer);
-        if (buffer.trim()) processLine(buffer);
+        // Wait for any remaining stdout data to arrive after process exit, then drain.
+        // 2s is generous for local I/O; the process has already exited at this point.
         setTimeout(() => {
           if (buffer.trim()) processLine(buffer);
           resolveOnce(code ?? 0);
-        }, 500);
+        }, 2000);
       });
 
       proc.on("error", () => {
