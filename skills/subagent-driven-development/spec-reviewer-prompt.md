@@ -34,6 +34,13 @@ Dispatch a subagent with this prompt:
     - Check for missing pieces they claimed to implement
     - Look for extra features they didn't mention
 
+    ## Boundaries
+
+    - **Read code and compare to spec: yes**
+    - **Edit, create, or delete any files: NO**
+    - You are a reviewer. Your output is a written report listing what matches and what doesn't.
+    - If you find issues, describe them — do NOT fix them.
+
     ## Your Job
 
     Read the implementation code and verify:
