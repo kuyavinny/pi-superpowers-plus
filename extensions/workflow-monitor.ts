@@ -652,7 +652,8 @@ export default function (pi: ExtensionAPI) {
   // --- Format violation warning based on type ---
   function formatViolationWarning(violation: Violation): string {
     if (violation.type === "source-before-test" || violation.type === "source-during-red") {
-      return getTddViolationWarning(violation.type, violation.file);
+      const phase = handler.getWorkflowState()?.currentPhase;
+      return getTddViolationWarning(violation.type, violation.file, phase ?? undefined);
     }
     return getDebugViolationWarning(
       violation.type as DebugViolationType,
