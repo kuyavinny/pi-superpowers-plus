@@ -23,6 +23,7 @@ import { type ExtensionAPI, getMarkdownTheme } from "@mariozechner/pi-coding-age
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { buildSubagentEnv } from "./env.js";
+import { getSubagentTimeoutMs } from "./timeout.js";
 import { log } from "../logging.js";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
 
@@ -355,12 +356,14 @@ async function runSingleAgent(
       });
       let buffer = "";
       let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+      let absoluteTimer: ReturnType<typeof setTimeout> | null = null;
       let exitResolved = false;
 
       const resolveOnce = (code: number) => {
         if (exitResolved) return;
         exitResolved = true;
         if (inactivityTimer) clearTimeout(inactivityTimer);
+        if (absoluteTimer) clearTimeout(absoluteTimer);
         resolve(code);
       };
 
@@ -422,6 +425,21 @@ async function runSingleAgent(
       };
 
       resetInactivityTimer();
+
+      // Absolute timeout — kills regardless of activity
+      const absoluteTimeoutMs = getSubagentTimeoutMs(agent.timeout);
+      absoluteTimer = setTimeout(() => {
+        if (exitResolved) return;
+        const seconds = Math.round(absoluteTimeoutMs / 1000);
+        log.debug(`Subagent killed after ${seconds}s absolute timeout`);
+        currentResult.errorMessage = `Subagent timed out after ${seconds}s`;
+        if (buffer.trim()) processLine(buffer);
+        proc.kill("SIGTERM");
+        setTimeout(() => {
+          if (!proc.killed) proc.kill("SIGKILL");
+        }, 5000);
+        resolveOnce(1);
+      }, absoluteTimeoutMs);
 
       proc.stdout.on("data", (data) => {
         buffer += data.toString();

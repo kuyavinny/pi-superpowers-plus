@@ -154,6 +154,38 @@ describe("subagent/index error handling", () => {
     expect(INACTIVITY_TIMEOUT_MS).toBe(120_000);
   });
 
+  test("kills subagent after absolute timeout", async () => {
+    vi.useFakeTimers();
+    // Set absolute timeout shorter than inactivity timeout (120s)
+    const originalTimeout = process.env.PI_SUBAGENT_TIMEOUT_MS;
+    process.env.PI_SUBAGENT_TIMEOUT_MS = "30000"; // 30s
+
+    const proc = createFakeProcess();
+    spawnMock.mockReturnValue(proc);
+
+    const tool = registerTool();
+    const resultPromise = tool.execute(
+      "id",
+      { agent: "test-agent", task: "do work" },
+      undefined,
+      undefined,
+      {
+        cwd: process.cwd(),
+        hasUI: false,
+      },
+    );
+
+    // Advance past the 30s absolute timeout but before 120s inactivity
+    await vi.advanceTimersByTimeAsync(35_000);
+
+    const result = await resultPromise;
+    expect(proc.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(result.content[0].text).toContain("timed out");
+
+    process.env.PI_SUBAGENT_TIMEOUT_MS = originalTimeout;
+    vi.useRealTimers();
+  });
+
   test("returns error when cwd does not exist", async () => {
     const tool = registerTool();
     const result = await tool.execute(
