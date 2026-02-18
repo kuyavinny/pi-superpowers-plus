@@ -57,11 +57,7 @@ export function getStateFilePath(): string {
   return path.join(process.cwd(), ".pi", "superpowers-state.json");
 }
 
-export function reconstructState(
-  ctx: ExtensionContext,
-  handler: WorkflowHandler,
-  stateFilePath?: string | false,
-) {
+export function reconstructState(ctx: ExtensionContext, handler: WorkflowHandler, stateFilePath?: string | false) {
   handler.resetState();
 
   // Try file-based state first (survives across sessions)

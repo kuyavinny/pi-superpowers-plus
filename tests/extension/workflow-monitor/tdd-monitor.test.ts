@@ -29,8 +29,8 @@ describe("TddMonitor", () => {
   });
 
   test("does not warn when corresponding test file already exists on disk", () => {
-    const monitorWithDiskTests = new TddMonitor((candidatePath) =>
-      candidatePath === "src/utils.test.ts" || candidatePath === "tests/utils.test.ts",
+    const monitorWithDiskTests = new TddMonitor(
+      (candidatePath) => candidatePath === "src/utils.test.ts" || candidatePath === "tests/utils.test.ts",
     );
 
     const violation = monitorWithDiskTests.onFileWritten("src/utils.ts");

@@ -39,7 +39,9 @@ export class TddMonitor {
       this.sourceFilesWritten.add(path);
 
       if (this.testFilesWritten.size === 0) {
-        const existingTestFile = findCorrespondingTestFile(path).some((candidatePath) => this.fileExists(candidatePath));
+        const existingTestFile = findCorrespondingTestFile(path).some((candidatePath) =>
+          this.fileExists(candidatePath),
+        );
         if (!existingTestFile) {
           return { type: "source-before-test", file: path };
         }

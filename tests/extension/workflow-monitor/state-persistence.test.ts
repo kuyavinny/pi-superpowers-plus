@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import workflowMonitorExtension, { getStateFilePath, reconstructState } from "../../../extensions/workflow-monitor";
 import { DebugMonitor } from "../../../extensions/workflow-monitor/debug-monitor";
 import {
