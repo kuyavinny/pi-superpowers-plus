@@ -14,6 +14,7 @@ import { StringEnum } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
+import { log } from "./logging.js";
 import { getCurrentGitRef } from "./workflow-monitor/git";
 import { loadReference, REFERENCE_TOPICS } from "./workflow-monitor/reference-tool";
 import { getUnresolvedPhases, getUnresolvedPhasesBefore } from "./workflow-monitor/skip-confirmation";
@@ -71,8 +72,10 @@ export function reconstructState(ctx: ExtensionContext, handler: WorkflowHandler
         handler.setFullState(data);
         return;
       }
-    } catch {
-      // Fall through to session entries
+    } catch (err) {
+      log.warn(
+        `Failed to read state file, falling back to session entries: ${err instanceof Error ? err.message : err}`,
+      );
     }
   }
 
@@ -149,8 +152,8 @@ export default function (pi: ExtensionAPI) {
       const statePath = getStateFilePath();
       fs.mkdirSync(path.dirname(statePath), { recursive: true });
       fs.writeFileSync(statePath, JSON.stringify(handler.getFullState(), null, 2));
-    } catch {
-      // Silently fail — session entry is the fallback
+    } catch (err) {
+      log.warn(`Failed to persist state file: ${err instanceof Error ? err.message : err}`);
     }
   };
 

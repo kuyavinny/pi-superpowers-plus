@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import * as logging from "../../../extensions/logging";
 import workflowMonitorExtension, { getStateFilePath, reconstructState } from "../../../extensions/workflow-monitor";
 import { DebugMonitor } from "../../../extensions/workflow-monitor/debug-monitor";
 import {
@@ -334,6 +335,28 @@ describe("file-based state persistence", () => {
     );
 
     expect(handler.getFullState()).toEqual(snapshot);
+  });
+
+  test("reconstructState logs warning when state file has invalid JSON", () => {
+    const tempDir = withTempCwd();
+    const handler = createWorkflowHandler();
+
+    fs.mkdirSync(path.join(tempDir, ".pi"), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, ".pi", "superpowers-state.json"), "not valid json{{{");
+
+    const warnSpy = vi.spyOn(logging.log, "warn");
+
+    reconstructState(
+      {
+        sessionManager: {
+          getBranch: () => [],
+        },
+      } as any,
+      handler,
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to read state file"));
+    warnSpy.mockRestore();
   });
 
   test("reconstructState falls back to session entries when file does not exist", () => {

@@ -13,3 +13,20 @@ Adding file I/O to production code (like writing `.pi/superpowers-state.json` re
 
 ### Double-processing buffer on exit
 When draining a line-buffered stream after process exit, don't process the buffer both immediately AND after a timeout delay — the buffer isn't cleared by `processLine`, so the same partial line gets processed twice. Use a single drain point.
+
+## v0.3.0 Hardening Sprint — 2026-02-18
+
+### Node.js `proc.killed` is unreliable for SIGKILL escalation
+`proc.killed` is set to `true` immediately after `.kill()` is called, NOT when the process actually exits. So `if (!proc.killed) proc.kill("SIGKILL")` after a prior SIGTERM will never fire. Fix: use `try { proc.kill("SIGKILL") } catch {}` — always attempt SIGKILL after the grace period; sending a signal to a dead process is harmless.
+
+### `LANG` prefix matching leaks secrets
+Using `"LANG"` as a `startsWith` prefix in an env var allowlist matches `LANGCHAIN_API_KEY`, `LANGSMITH_API_KEY`, etc. Always use explicit var names for locale vars (`LANG`, `LANGUAGE`) and only prefix-match `LC_`.
+
+### `fs.existsSync` doesn't mean it's a directory
+`existsSync` returns `true` for files and symlinks, not just directories. When validating a cwd for `spawn()`, use `fs.statSync(path).isDirectory()` wrapped in try/catch.
+
+### Biome auto-fix can be aggressive
+`biome check --write` reformatted code across 6 files in one run. Always re-run the full test suite after lint fixes — formatting changes can subtly break things.
+
+### TDD guard tracks RED-PENDING phase strictly
+The TDD guard fires if you write production code after writing tests but before it sees a test run. It fires even if you did run tests and the output was truncated/pruned. Just acknowledge and proceed — the guard is intentionally strict to prevent skipping the RED step.

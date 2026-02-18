@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createMockLogger } from "../../helpers/mock-logger.js";
 import * as logging from "../../../extensions/logging.js";
@@ -152,5 +153,161 @@ describe("subagent/index error handling", () => {
 
   test("exports inactivity timeout constant", () => {
     expect(INACTIVITY_TIMEOUT_MS).toBe(120_000);
+  });
+
+  test("respects concurrency cap for parallel tasks", async () => {
+    // Set concurrency to 1 to verify serialization
+    const originalConcurrency = process.env.PI_SUBAGENT_CONCURRENCY;
+    process.env.PI_SUBAGENT_CONCURRENCY = "1";
+
+    let activeSpawns = 0;
+    let maxActiveSpawns = 0;
+
+    spawnMock.mockImplementation(() => {
+      activeSpawns++;
+      maxActiveSpawns = Math.max(maxActiveSpawns, activeSpawns);
+      const proc = createFakeProcess();
+      queueMicrotask(() => {
+        activeSpawns--;
+        proc.emit("exit", 0);
+      });
+      return proc;
+    });
+
+    // Re-register agent with two-agent list
+    discoverAgentsMock.mockReturnValue({
+      agents: [
+        { name: "agent-a", source: "user", filePath: "/tmp/a.md", systemPrompt: "" },
+        { name: "agent-b", source: "user", filePath: "/tmp/b.md", systemPrompt: "" },
+      ],
+      projectAgentsDir: null,
+    });
+
+    const tool = registerTool();
+    await tool.execute(
+      "id",
+      {
+        tasks: [
+          { agent: "agent-a", task: "task 1" },
+          { agent: "agent-b", task: "task 2" },
+        ],
+      },
+      undefined,
+      undefined,
+      { cwd: process.cwd(), hasUI: false },
+    );
+
+    // With concurrency cap of 1, max active spawns should be 1
+    expect(maxActiveSpawns).toBe(1);
+
+    process.env.PI_SUBAGENT_CONCURRENCY = originalConcurrency;
+  });
+
+  test("kills subagent after absolute timeout", async () => {
+    vi.useFakeTimers();
+    // Set absolute timeout shorter than inactivity timeout (120s)
+    const originalTimeout = process.env.PI_SUBAGENT_TIMEOUT_MS;
+    process.env.PI_SUBAGENT_TIMEOUT_MS = "30000"; // 30s
+
+    const proc = createFakeProcess();
+    spawnMock.mockReturnValue(proc);
+
+    const tool = registerTool();
+    const resultPromise = tool.execute("id", { agent: "test-agent", task: "do work" }, undefined, undefined, {
+      cwd: process.cwd(),
+      hasUI: false,
+    });
+
+    // Advance past the 30s absolute timeout but before 120s inactivity
+    await vi.advanceTimersByTimeAsync(35_000);
+
+    const result = await resultPromise;
+    expect(proc.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(result.content[0].text).toContain("timed out");
+
+    process.env.PI_SUBAGENT_TIMEOUT_MS = originalTimeout;
+    vi.useRealTimers();
+  });
+
+  test("escalates to SIGKILL when process does not exit after SIGTERM timeout", async () => {
+    vi.useFakeTimers();
+    const originalTimeout = process.env.PI_SUBAGENT_TIMEOUT_MS;
+    process.env.PI_SUBAGENT_TIMEOUT_MS = "10000"; // 10s
+
+    const proc = createFakeProcess();
+    // Realistic kill: sets proc.killed = true like Node.js does
+    const killCalls: string[] = [];
+    proc.kill = vi.fn((sig: string) => {
+      killCalls.push(sig);
+      proc.killed = true; // Node.js sets this after ANY signal
+      return true;
+    });
+    spawnMock.mockReturnValue(proc);
+
+    const tool = registerTool();
+    const resultPromise = tool.execute("id", { agent: "test-agent", task: "do work" }, undefined, undefined, {
+      cwd: process.cwd(),
+      hasUI: false,
+    });
+
+    // Advance past absolute timeout (10s)
+    await vi.advanceTimersByTimeAsync(11_000);
+    // Advance past SIGKILL grace period (5s)
+    await vi.advanceTimersByTimeAsync(6_000);
+
+    // Manually emit exit so the promise resolves
+    proc.emit("exit", 1);
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    await resultPromise;
+    expect(killCalls).toContain("SIGTERM");
+    expect(killCalls).toContain("SIGKILL");
+
+    process.env.PI_SUBAGENT_TIMEOUT_MS = originalTimeout;
+    vi.useRealTimers();
+  });
+
+  test("returns error when cwd is a file not a directory", async () => {
+    // Create a temp file to use as cwd — use os.tmpdir to avoid mock interference
+    const os = await import("node:os");
+    const tmpFile = path.join(os.tmpdir(), `subagent-test-${Date.now()}.txt`);
+    const { writeFileSync, unlinkSync } = await import("node:fs");
+    writeFileSync(tmpFile, "hello");
+
+    try {
+      const tool = registerTool();
+      const result = await tool.execute(
+        "id",
+        { agent: "test-agent", task: "do work", cwd: tmpFile },
+        undefined,
+        undefined,
+        { cwd: process.cwd(), hasUI: false },
+      );
+
+      expect(spawnMock).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain("cwd is not a directory");
+    } finally {
+      try {
+        unlinkSync(tmpFile);
+      } catch {}
+    }
+  });
+
+  test("returns error when cwd does not exist", async () => {
+    const tool = registerTool();
+    const result = await tool.execute(
+      "id",
+      { agent: "test-agent", task: "do work", cwd: "/nonexistent/path/that/does/not/exist" },
+      undefined,
+      undefined,
+      {
+        cwd: process.cwd(),
+        hasUI: false,
+      },
+    );
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain("cwd does not exist");
+    expect(result.content[0].text).toContain("/nonexistent/path/that/does/not/exist");
   });
 });
