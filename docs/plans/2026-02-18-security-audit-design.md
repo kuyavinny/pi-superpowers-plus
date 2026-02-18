@@ -1,18 +1,16 @@
-# Security Audit — Subagent Env Filtering & CWD Validation
+# v0.3.0 Hardening — Security, Subagent Lifecycle & Error Surfacing
 
 **Date:** 2026-02-18
 **Status:** Approved
-**Scope:** v0.3.0 roadmap item — Security Audit
+**Scope:** Remaining v0.3.0 roadmap items — Security Audit, Subagent Hardening, Error Surfacing Review
 
-## Problem
+---
 
-Subagent spawn passes `{ ...process.env }` to child processes, leaking all environment variables including secrets (API keys, database URLs, cloud credentials). Project-local agents from untrusted repos inherit everything in the parent shell.
+## 1. Environment Variable Filtering
 
-## Design
+**Problem:** Subagent spawn passes `{ ...process.env }` to child processes, leaking all environment variables including secrets (API keys, database URLs, cloud credentials). Project-local agents from untrusted repos inherit everything in the parent shell.
 
-### 1. Environment Variable Filtering
-
-Replace `{ ...process.env }` with a prefix-based allowlist plus an explicit set of known-safe variables.
+**Fix:** Replace `{ ...process.env }` with a prefix-based allowlist plus an explicit set of known-safe variables.
 
 **Allowlist prefixes:**
 - `PI_` — pi-specific config
@@ -30,14 +28,24 @@ Replace `{ ...process.env }` with a prefix-based allowlist plus an explicit set 
 `PI_SUBAGENT_ENV_PASSTHROUGH` — comma-separated variable names to forward. Read from the parent `process.env` before filtering.
 
 **Implementation:**
-- New function `buildSubagentEnv()` in `extensions/subagent/index.ts` (or a small util)
+- New function `buildSubagentEnv()` in `extensions/subagent/env.ts`
 - Iterates `Object.entries(process.env)`, keeps entries matching prefixes or explicit set
 - Merges passthrough vars
-- Adds `PI_TDD_GUARD_VIOLATIONS_FILE` (already done per-invocation)
+- Adds `PI_TDD_GUARD_VIOLATIONS_FILE` per-invocation (already done, just uses the filtered env as base)
 
-### 2. CWD Existence Check
+**Tests:**
+- Includes PATH, HOME, PI_* vars
+- Excludes AWS_SECRET_ACCESS_KEY, DATABASE_URL, etc.
+- Passthrough override works
+- Empty/missing passthrough var is a no-op
 
-Before spawn, resolve the cwd path and verify the directory exists. If not, fail with a clear error message instead of a cryptic `ENOENT` from spawn.
+---
+
+## 2. CWD Validation
+
+**Problem:** If the LLM passes a nonexistent `cwd`, spawn throws a cryptic `ENOENT`.
+
+**Fix:** Resolve and verify the directory exists before spawn. No path restrictions — subagents have the same permissions as pi and can `cd` anywhere via bash regardless.
 
 ```typescript
 const resolved = path.resolve(cwd);
@@ -46,23 +54,110 @@ if (!fs.existsSync(resolved)) {
 }
 ```
 
-No path restrictions — subagents have the same permissions as pi and can `cd` anywhere via bash regardless.
+**Tests:**
+- Nonexistent cwd produces clear error message
 
-### 3. Spawn Args
+---
 
-No changes needed. `shell: false` prevents shell injection. Task strings are prefixed with `Task: ` so they can't be parsed as flags. Already solid.
+## 3. Subagent Timeout & Kill
 
-## Testing
+**Problem:** A stuck subagent runs forever with no way to stop it.
 
-- Env filter includes PATH, HOME, PI_* vars
-- Env filter excludes common secrets (AWS_SECRET_ACCESS_KEY, DATABASE_URL)
-- Passthrough override works (PI_SUBAGENT_ENV_PASSTHROUGH=MY_VAR forwards MY_VAR)
-- CWD validation rejects nonexistent directories with clear error
-- Existing subagent integration tests still pass
+**Fix:** Configurable per-invocation timeout, default 10 minutes. When hit, the subagent process is killed and the invocation returns an error result.
 
-## Scope
+- New config: `PI_SUBAGENT_TIMEOUT_MS` env var (default: `600000` / 10 min)
+- Agent definitions can override via `timeout` field in agent YAML
+- On timeout: `proc.kill('SIGTERM')`, wait 5s, then `SIGKILL` if still alive
+- Return a clear error: `"Subagent timed out after 10 minutes"`
 
-- ~30 lines for env filtering function
-- ~5 lines for cwd validation
-- ~50 lines of tests
-- Touches: `extensions/subagent/index.ts`
+**Tests:**
+- Timeout triggers kill after configured duration
+- Agent-level override takes precedence over default
+- Graceful SIGTERM → SIGKILL escalation
+
+---
+
+## 4. Cancellation Propagation
+
+**Problem:** If the parent session is interrupted (user kills pi, ctrl+c), spawned subagents keep running as orphans.
+
+**Fix:** Track active subagent processes and clean them up on extension teardown.
+
+- Maintain a `Set<ChildProcess>` of active subagent processes
+- On process exit/close, remove from the set
+- Register a cleanup handler (extension `destroy` or `process.on('exit')`) that kills all active processes
+- Use SIGTERM with the same 5s → SIGKILL escalation
+
+**Tests:**
+- Active processes tracked and removed on exit
+- Cleanup kills remaining processes
+
+---
+
+## 5. Concurrent Subagent Cap
+
+**Problem:** Unbounded parallel subagent spawns could exhaust API rate limits or model provider concurrency caps.
+
+**Fix:** Simple semaphore — queue when the cap is hit, run when a slot opens.
+
+- Default cap: `6` concurrent subagents
+- Configurable via `PI_SUBAGENT_CONCURRENCY` env var
+- When cap is hit, the invocation awaits a slot (no error, just waits)
+- Log when queuing: `"Subagent queued — 6/6 slots in use"`
+
+**Tests:**
+- Respects configured cap
+- Queued invocations run when slots free up
+- Custom cap via env var
+
+---
+
+## 6. Error Surfacing — Silent Catch Blocks
+
+**Problem:** Two catch blocks in `workflow-monitor.ts` silently swallow failures that change behavior.
+
+**Catch 1 — State file read (line 74):**
+State file read fails → falls through to session entries with no log. User doesn't know file-based persistence is broken.
+
+**Fix:** Add `log.warn()` so it shows in the debug log:
+```typescript
+} catch (err) {
+  log.warn(`Failed to read state file, falling back to session entries: ${err instanceof Error ? err.message : err}`);
+}
+```
+
+**Catch 2 — State file write (line 152):**
+State file write fails → silently drops persistence. User has no idea state won't survive restarts.
+
+**Fix:** Add `log.warn()` + one-time `ctx.ui.notify()` so the user sees it:
+```typescript
+} catch (err) {
+  log.warn(`Failed to persist state file: ${err instanceof Error ? err.message : err}`);
+  // Notify once — repeated failures are common (e.g., read-only fs)
+  if (!stateWriteWarned) {
+    stateWriteWarned = true;
+    ctx.ui.notify("⚠️ Workflow state file persistence failed — state may not survive restarts");
+  }
+}
+```
+
+**All other catch blocks (11 total):** Already log via `log.debug` or `log.warn`. No changes needed.
+
+**Tests:**
+- State read failure logs warning and falls back to session entries
+- State write failure logs warning and notifies user once
+
+---
+
+## Summary
+
+| Item | Lines of code (est.) | Files touched |
+|------|---------------------|---------------|
+| Env filtering | ~40 | `extensions/subagent/env.ts` (new), `extensions/subagent/index.ts` |
+| CWD validation | ~5 | `extensions/subagent/index.ts` |
+| Timeout & kill | ~40 | `extensions/subagent/index.ts` |
+| Cancellation propagation | ~25 | `extensions/subagent/index.ts` |
+| Concurrent cap | ~35 | `extensions/subagent/index.ts` |
+| Silent catch fixes | ~10 | `extensions/workflow-monitor.ts` |
+| Tests | ~120 | `tests/extension/subagent/`, `tests/extension/` |
+| **Total** | **~275** | |
