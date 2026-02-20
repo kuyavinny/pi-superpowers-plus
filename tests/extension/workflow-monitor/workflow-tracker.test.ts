@@ -66,10 +66,34 @@ describe("WorkflowTracker", () => {
     expect(s.phases.plan).toBe("skipped");
   });
 
-  test("advanceTo is forward-only (no-op when going backwards)", () => {
+  test("advanceTo backward triggers full reset and activates the target phase", () => {
     tracker.advanceTo("plan");
-    tracker.advanceTo("brainstorm");
-    expect(tracker.getState().currentPhase).toBe("plan");
+    tracker.recordArtifact("plan", "docs/plans/foo.md");
+    tracker.markPrompted("plan");
+
+    const result = tracker.advanceTo("brainstorm");
+
+    const s = tracker.getState();
+    expect(result).toBe(true);
+    expect(s.currentPhase).toBe("brainstorm");
+    expect(s.phases.brainstorm).toBe("active");
+    // plan should be wiped by the reset
+    expect(s.phases.plan).toBe("pending");
+    expect(s.artifacts.plan).toBeNull();
+    expect(s.prompted.plan).toBe(false);
+  });
+
+  test("advanceTo same phase triggers full reset and reactivates that phase", () => {
+    tracker.advanceTo("plan");
+    tracker.completeCurrent();
+    expect(tracker.getState().phases.plan).toBe("complete");
+
+    const result = tracker.advanceTo("plan");
+
+    const s = tracker.getState();
+    expect(result).toBe(true);
+    expect(s.currentPhase).toBe("plan");
+    expect(s.phases.plan).toBe("active");
   });
 
   test("completeCurrent marks current phase complete and keeps it as current until next advance", () => {

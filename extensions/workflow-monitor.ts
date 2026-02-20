@@ -657,7 +657,12 @@ export default function (pi: ExtensionAPI) {
       const phaseAfterSkip = WORKFLOW_PHASES[nextIdx + 1] ?? null;
 
       if (phaseAfterSkip) {
-        handler.advanceWorkflowTo(phaseAfterSkip);
+        const currentState = handler.getWorkflowState();
+        const currentIdx = currentState?.currentPhase ? WORKFLOW_PHASES.indexOf(currentState.currentPhase) : -1;
+        const afterSkipIdx = WORKFLOW_PHASES.indexOf(phaseAfterSkip);
+        if (afterSkipIdx > currentIdx) {
+          handler.advanceWorkflowTo(phaseAfterSkip);
+        }
       }
 
       persistState();

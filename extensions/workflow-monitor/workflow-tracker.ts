@@ -95,10 +95,15 @@ export class WorkflowTracker {
 
     if (current) {
       const curIdx = WORKFLOW_PHASES.indexOf(current);
-      if (nextIdx <= curIdx) return false;
-
-      if (this.state.phases[current] === "active") {
-        this.state.phases[current] = "complete";
+      if (nextIdx <= curIdx) {
+        // Backward or same-phase navigation = new task. Reset everything.
+        this.reset();
+        // Fall through to activate the target phase below.
+      } else {
+        // Forward advance: auto-complete the current phase.
+        if (this.state.phases[current] === "active") {
+          this.state.phases[current] = "complete";
+        }
       }
     }
 
