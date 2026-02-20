@@ -328,7 +328,7 @@ Based on [Superpowers](https://github.com/obra/superpowers) by Jesse Vincent, po
 | **Workflow tracking** | — | — | Phase strip, boundary prompts, `/workflow-next` |
 | **Subagent dispatch** | — | — | Bundled `subagent` tool + 4 agent definitions |
 | **TDD in subagents** | — | — | Subagent-driven-development skill enforces TDD via agent system prompts |
-| **Structured results** | — | — | filesChanged, testsRan, tddViolations per agent |
+| **Structured results** | — | — | filesChanged, testsRan per agent |
 | **Reference content** | Everything in SKILL.md | Everything in SKILL.md | Lean skill + on-demand `workflow_reference` tool |
 | **Plan tracker** | — | — | `plan_tracker` tool with TUI progress widget |
 
