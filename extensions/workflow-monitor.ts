@@ -430,7 +430,9 @@ export default function (pi: ExtensionAPI) {
       const executeIdx = WORKFLOW_PHASES.indexOf("execute");
 
       // Completion action gating (interactive only, execute+ phases)
-      if (ctx.hasUI && state && phaseIdx >= executeIdx) {
+      // Suppress during active plan execution — prompts only fire after execution completes
+      const isExecuting = state?.currentPhase === "execute" && state.phases.execute === "active";
+      if (ctx.hasUI && state && phaseIdx >= executeIdx && !isExecuting) {
         const actionTarget = getCompletionActionTarget(command);
         if (actionTarget) {
           const unresolved = getUnresolvedPhasesForAction(actionTarget, state);
