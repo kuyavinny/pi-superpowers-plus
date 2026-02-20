@@ -29,7 +29,7 @@ description: A test agent
 extensions: ../extensions/some-extension.ts
 ---
 You are a test agent.
-`
+`,
     );
 
     const agents = loadAgentsFromDir(tmpDir, "user");
@@ -47,7 +47,7 @@ description: Agent with multiple extensions
 extensions: ../extensions/ext-a.ts, ../extensions/ext-b.ts
 ---
 You are a multi-extension agent.
-`
+`,
     );
 
     const agents = loadAgentsFromDir(tmpDir, "project");
@@ -64,7 +64,7 @@ name: no-ext-agent
 description: Agent without extensions
 ---
 You are an agent with no extensions.
-`
+`,
     );
 
     const agents = loadAgentsFromDir(tmpDir, "user");
@@ -82,7 +82,7 @@ description: Agent with empty extensions field
 extensions: 
 ---
 You are an agent with an empty extensions field.
-`
+`,
     );
 
     const agents = loadAgentsFromDir(tmpDir, "user");
@@ -101,7 +101,7 @@ description: Agent with whitespace in extensions
 extensions:  ../extensions/ext-a.ts ,  ../extensions/ext-b.ts 
 ---
 You are a trimmed agent.
-`
+`,
     );
 
     const agents = loadAgentsFromDir(tmpDir, "user");
