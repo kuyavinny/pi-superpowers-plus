@@ -662,16 +662,13 @@ export default function (pi: ExtensionAPI) {
         const afterSkipIdx = WORKFLOW_PHASES.indexOf(phaseAfterSkip);
         if (afterSkipIdx > currentIdx) {
           handler.advanceWorkflowTo(phaseAfterSkip);
+          const skipSkill = phaseToSkill[phaseAfterSkip] ?? "writing-plans";
+          ctx.ui.setEditorText(`/skill:${skipSkill}`);
         }
       }
 
       persistState();
       updateWidget(ctx);
-
-      if (phaseAfterSkip) {
-        const skipSkill = phaseToSkill[phaseAfterSkip] ?? "writing-plans";
-        ctx.ui.setEditorText(`/skill:${skipSkill}`);
-      }
     }
   });
 
