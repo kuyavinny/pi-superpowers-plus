@@ -256,9 +256,7 @@ Skills are markdown files the agent reads to learn *what* to do. Extensions are 
 | Follow workflow phases | All skills cross-reference each other | Workflow tracker detects phases, prompts at boundaries |
 | Dispatch implementation work | `subagent-driven-development` | Subagent extension spawns isolated agents |
 | Review before merge | `requesting-code-review` | Subagent dispatches code-reviewer agent |
-| Enforce TDD in subagents | — | tdd-guard blocks writes until tests pass |
-
-The orchestrating agent's enforcement is advisory (warnings injected into tool results). Subagent enforcement via tdd-guard is harder: writes are blocked outright, and repeated violations terminate the subprocess.
+The orchestrating agent's enforcement is advisory (warnings injected into tool results).
 
 ## Subagent Dispatch
 
@@ -268,8 +266,8 @@ A bundled `subagent` tool lets the orchestrating agent spawn isolated subprocess
 
 | Agent | Purpose | Tools | Extensions |
 |-------|---------|-------|------------|
-| `implementer` | Strict TDD implementation | read, write, edit, bash, lsp | tdd-guard |
-| `worker` | General-purpose task execution | read, write, edit, bash, lsp | tdd-guard |
+| `implementer` | Strict TDD implementation | read, write, edit, bash, lsp | — |
+| `worker` | General-purpose task execution | read, write, edit, bash, lsp | — |
 | `code-reviewer` | Production readiness review | read, bash (read-only) | — |
 | `spec-reviewer` | Plan/spec compliance check | read, bash (read-only) | — |
 
@@ -297,15 +295,7 @@ subagent({
 Single-agent results include:
 - `filesChanged` — list of files written/edited
 - `testsRan` — whether any test commands were executed
-- `tddViolations` — count of blocked production writes (from tdd-guard)
 - `status` — `"completed"` or `"failed"`
-
-### TDD Guard
-
-The `tdd-guard` extension ships alongside the subagent system. When declared in an agent's frontmatter, it:
-- **Blocks** writes to non-test files until a *passing* test run is observed
-- **Tracks violations** via a temp file (reported in structured results)
-- **Hard-exits** after 3 consecutive blocked writes (prevents runaway agents)
 
 ### Custom Agents
 
@@ -337,7 +327,7 @@ Based on [Superpowers](https://github.com/obra/superpowers) by Jesse Vincent, po
 | **Verification gating** | — | — | Blocks commit/push/PR until tests pass |
 | **Workflow tracking** | — | — | Phase strip, boundary prompts, `/workflow-next` |
 | **Subagent dispatch** | — | — | Bundled `subagent` tool + 4 agent definitions |
-| **TDD in subagents** | — | — | tdd-guard extension blocks writes until tests pass |
+| **TDD in subagents** | — | — | Subagent-driven-development skill enforces TDD via agent system prompts |
 | **Structured results** | — | — | filesChanged, testsRan, tddViolations per agent |
 | **Reference content** | Everything in SKILL.md | Everything in SKILL.md | Lean skill + on-demand `workflow_reference` tool |
 | **Plan tracker** | — | — | `plan_tracker` tool with TUI progress widget |
@@ -354,7 +344,6 @@ pi-superpowers-plus/
 ├── extensions/
 │   ├── logging.ts                     # File-based diagnostic logger (10KB truncation, time-based rotation)
 │   ├── plan-tracker.ts                # Task tracking tool + TUI widget
-│   ├── tdd-guard.ts                   # TDD enforcement for subagents
 │   ├── workflow-monitor.ts            # Extension entry point (event wiring)
 │   ├── workflow-monitor/
 │   │   ├── tdd-monitor.ts             # TDD phase state machine
