@@ -75,19 +75,96 @@ The following content was moved to `workflow_reference` but must come back inlin
 
 **Keep `workflow_reference` as supplemental** — the agent can still call it for examples and deep-dive content, but the critical guardrails are always visible in the prompt.
 
-### 4. Subagent TDD Prompt Injection
+### 4. Subagent TDD Guidance — Three Injection Points
 
-When the subagent extension dispatches an implementation subagent, auto-append a condensed TDD instruction block to the task description:
+TDD guidance reaches subagents through three layers. Each serves a different purpose.
 
+**Layer A: Agent profiles (`agents/implementer.md`, `agents/worker.md`) — standing system prompt**
+
+Remove `extensions: ../extensions/tdd-guard.ts` from frontmatter. Replace terse rules with:
+
+For `implementer.md`:
+```markdown
+---
+name: implementer
+description: Implement tasks via TDD and commit small changes
+tools: read, write, edit, bash, lsp
+model: claude-sonnet-4-5
+---
+
+You are an implementation subagent.
+
+## TDD Approach
+
+Determine which scenario applies before writing code:
+
+**New files / new features:** Full TDD. Write a failing test first, verify it fails, implement minimal code to pass, refactor.
+
+**Modifying code with existing tests:** Run existing tests first to confirm green. Make your change. Run tests again. If the change isn't covered by existing tests, add a test. If it is, you're done.
+
+**Trivial changes (typo, config, rename):** Use judgment. Run relevant tests after if they exist.
+
+**If you see a ⚠️ TDD warning:** Pause. Consider which scenario applies. If existing tests cover your change, run them and proceed. If not, write a test first.
+
+## Rules
+- Keep changes minimal and scoped to the task.
+- Run the narrowest test(s) first, then the full suite when appropriate.
+- Commit when the task's tests pass.
+- Report: what changed, tests run, files changed, any concerns.
 ```
-## TDD Requirements
+
+For `worker.md`:
+```markdown
+---
+name: worker
+description: General-purpose worker for isolated tasks
+tools: read, write, edit, bash, lsp
+model: claude-sonnet-4-5
+---
+
+You are a general-purpose subagent. Follow the task exactly.
+
+## TDD (when changing production code)
+
 - New files: write a failing test first, then implement.
-- Modifying existing code: run existing tests first, make your change, run tests again. Add tests if the change isn't covered.
+- Modifying existing code: run existing tests first, make your change, run again. Add tests if not covered.
 - Trivial changes: run relevant tests after if they exist.
 - If you see a ⚠️ TDD warning, pause and decide which scenario applies before proceeding.
+
+Prefer small, test-backed changes.
 ```
 
-This is appended automatically — the orchestrator doesn't need to remember. Non-implementation subagents (review, docs, analysis) see the text but it's short enough to be irrelevant noise.
+**Layer B: Implementer prompt template (`skills/subagent-driven-development/implementer-prompt.md`) — per-task instructions**
+
+Replace the rigid TDD line in "Your Job":
+```
+    ## Your Job
+
+    Once you're clear on requirements:
+    1. Determine TDD scenario for this task:
+       - New code → full TDD (failing test first)
+       - Modifying tested code → run existing tests before and after
+       - Trivial change → use judgment, run tests after
+    2. Implement exactly what the task specifies
+    3. Verify implementation works
+    4. Commit your work
+    5. Self-review (see below)
+    6. Report back
+```
+
+Replace the rigid TDD line in self-review:
+```
+    **Testing:**
+    - Did I follow the appropriate TDD scenario for this task?
+    - For new code: did I write a failing test first?
+    - For modified code: did I run existing tests before and after my change?
+    - Do tests actually verify behavior (not just mock behavior)?
+    - Are tests comprehensive?
+```
+
+**Layer C: Plan-level TDD scenario hints (from Section 5)**
+
+The orchestrator marks each task in the plan with its TDD scenario, so the subagent knows upfront which approach to take before it starts reading code. This is the orchestrator's responsibility, guided by the writing-plans skill.
 
 ### 5. Writing-Plans TDD Scenario Hints
 
@@ -123,16 +200,9 @@ To:
 - If plan execution is in progress → suppress prompt, default to verification ON
 - If plan execution is complete → prompt as normal (once, at the end)
 
-### 8. Update Subagent Profiles
+### 8. Update Subagent Prompt Templates
 
-Both `agents/implementer.md` and `agents/worker.md` have `extensions: ../extensions/tdd-guard.ts` in their frontmatter. Since `tdd-guard.ts` is being deleted, these must be updated:
-
-- **Remove** the `extensions:` frontmatter line (the guard no longer exists)
-- **Expand system prompts** with the condensed TDD guidance (three scenarios + warning interpretation). This is where the "subagent TDD prompt injection" from Section 4 actually lives — baked into the agent profiles rather than dynamically injected at dispatch time.
-
-This is simpler than runtime injection: the agent profiles are the natural place for standing instructions, and it means we don't need to modify the subagent dispatch extension at all.
-
-**Note:** This supersedes Section 4's "auto-injection at dispatch time" approach. The profiles handle it statically.
+The spec-reviewer and code-quality-reviewer prompt templates in `skills/subagent-driven-development/` are unchanged — they don't reference TDD enforcement. Only the implementer prompt template (covered in Section 4, Layer B) needs updating.
 
 ## Files Changed
 
@@ -147,8 +217,9 @@ This is simpler than runtime injection: the agent profiles are the natural place
 | `skills/verification-before-completion/SKILL.md` | **Modify** | Restore common failures, rationalization prevention, trigger list |
 | `skills/subagent-driven-development/SKILL.md` | **Modify** | Update TDD integration section |
 | `skills/writing-plans/SKILL.md` | **Modify** | Add TDD scenario hint to plan template |
-| `agents/implementer.md` | **Modify** | Remove tdd-guard extension, expand TDD prompt with three scenarios |
-| `agents/worker.md` | **Modify** | Remove tdd-guard extension, expand TDD prompt with three scenarios |
+| `agents/implementer.md` | **Rewrite** | Remove tdd-guard extension, full three-scenario TDD system prompt |
+| `agents/worker.md` | **Rewrite** | Remove tdd-guard extension, condensed three-scenario TDD guidance |
+| `skills/subagent-driven-development/implementer-prompt.md` | **Modify** | Replace rigid TDD line with scenario-aware instructions and self-review |
 | `tests/extension/tdd-guard/` | **Delete** | Tests for removed extension |
 
 ## Testing
