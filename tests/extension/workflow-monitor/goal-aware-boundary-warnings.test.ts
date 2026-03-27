@@ -4,7 +4,7 @@ import { WORKFLOW_TRACKER_ENTRY_TYPE } from "../../../extensions/workflow-monito
 import { createFakePi, getSingleHandler } from "./test-helpers";
 
 describe("goal-aware boundary warnings", () => {
-  test("writing an implementation plan missing goal sections injects a warning", async () => {
+  test("writing a plain plan file missing goal sections injects a warning", async () => {
     const fake = createFakePi();
     workflowMonitorExtension(fake.api as any);
 
@@ -46,7 +46,7 @@ describe("goal-aware boundary warnings", () => {
       {
         toolCallId: "g1",
         toolName: "write",
-        input: { path: "docs/plans/2026-03-27-sample-implementation.md", content },
+        input: { path: "docs/plans/2026-03-27-sample.md", content },
       },
       ctx,
     );
@@ -55,7 +55,7 @@ describe("goal-aware boundary warnings", () => {
       {
         toolCallId: "g1",
         toolName: "write",
-        input: { path: "docs/plans/2026-03-27-sample-implementation.md", content },
+        input: { path: "docs/plans/2026-03-27-sample.md", content },
         content: [{ type: "text", text: "ok" }],
         details: {},
       },

@@ -495,7 +495,7 @@ export default function (pi: ExtensionAPI) {
           );
         }
 
-        if (isPlansWrite && /-(design|implementation)\.md$/.test(resolved)) {
+        if (isPlansWrite && resolved.endsWith(".md")) {
           const content =
             event.toolName === "write" ? (input.content as string | undefined) : (input.newText as string | undefined);
           if (content) {
