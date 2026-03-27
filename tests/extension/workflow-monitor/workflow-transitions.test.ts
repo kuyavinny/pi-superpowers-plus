@@ -8,4 +8,10 @@ describe("workflow transitions", () => {
     expect(p.nextPhase).toBe("plan");
     expect(p.options).toHaveLength(4);
   });
+
+  test("plan-ready prompt mentions autoresearch when execution mode is autoresearch", () => {
+    const p = getTransitionPrompt("plan_ready", "docs/plans/x-implementation.md", { executionMode: "autoresearch" });
+    expect(p.title).toMatch(/autoresearch/i);
+    expect(p.nextPhase).toBe("execute");
+  });
 });

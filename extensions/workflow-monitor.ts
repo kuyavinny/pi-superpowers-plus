@@ -37,6 +37,7 @@ import {
   WORKFLOW_TRACKER_ENTRY_TYPE,
   type WorkflowTrackerState,
 } from "./workflow-monitor/workflow-tracker";
+import { parseGoalArtifact } from "./workflow-monitor/goal-artifacts";
 import { getTransitionPrompt } from "./workflow-monitor/workflow-transitions";
 
 type SelectOption<T extends string> = { label: string; value: T };
@@ -112,6 +113,7 @@ export default function (pi: ExtensionAPI) {
   const pendingVerificationViolations = new Map<string, VerificationViolation>();
   const pendingBranchGates = new Map<string, string>();
   const pendingProcessWarnings = new Map<string, string>();
+  const pendingGoalWarnings = new Map<string, string>();
 
   type ViolationBucket = "process" | "practice";
   const strikes: Record<ViolationBucket, number> = { process: 0, practice: 0 };
@@ -202,6 +204,7 @@ export default function (pi: ExtensionAPI) {
       pendingVerificationViolations.clear();
       pendingBranchGates.clear();
       pendingProcessWarnings.clear();
+      pendingGoalWarnings.clear();
       strikes.process = 0;
       strikes.practice = 0;
       delete sessionAllowed.process;
@@ -492,6 +495,22 @@ export default function (pi: ExtensionAPI) {
           );
         }
 
+        if (isPlansWrite && /-(design|implementation)\.md$/.test(resolved)) {
+          const content = event.toolName === "write"
+            ? (input.content as string | undefined)
+            : (input.newText as string | undefined);
+          if (content) {
+            const parsed = parseGoalArtifact(content);
+            if (parsed.missingSections.length > 0) {
+              pendingGoalWarnings.set(
+                toolCallId,
+                `⚠️ GOAL GAPS: This workflow artifact is missing required goal sections: ${parsed.missingSections.join(", ")}.\n` +
+                  "Before moving on, capture the goal clearly so the workflow can preserve intent and verify success.",
+              );
+            }
+          }
+        }
+
         changed = handler.handleFileWritten(filePath) || changed;
       }
 
@@ -561,6 +580,12 @@ export default function (pi: ExtensionAPI) {
         injected.push(processWarning);
       }
       pendingProcessWarnings.delete(toolCallId);
+
+      const goalWarning = pendingGoalWarnings.get(toolCallId);
+      if (goalWarning) {
+        injected.push(goalWarning);
+      }
+      pendingGoalWarnings.delete(toolCallId);
     }
 
     // Handle bash results (test runs, commits, investigation)
@@ -624,7 +649,17 @@ export default function (pi: ExtensionAPI) {
     if (!boundary) return;
 
     const boundaryPhase = boundaryToPhase[boundary];
-    const prompt = getTransitionPrompt(boundary, latestState.artifacts[boundaryPhase]);
+    const artifactPath = latestState.artifacts[boundaryPhase];
+    let executionMode: "standard" | "autoresearch" | null = null;
+    if (artifactPath && fs.existsSync(artifactPath)) {
+      try {
+        const artifact = fs.readFileSync(artifactPath, "utf-8");
+        executionMode = parseGoalArtifact(artifact).executionMode;
+      } catch {
+        executionMode = null;
+      }
+    }
+    const prompt = getTransitionPrompt(boundary, artifactPath, { executionMode });
 
     const options = prompt.options.map((o) => o.label);
     const pickedLabel = await ctx.ui.select(prompt.title, options);
