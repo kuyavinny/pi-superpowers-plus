@@ -14,14 +14,20 @@ Brainstorm → Plan → Execute → Verify → Review → Finish
 - Goal: turn a vague idea into a design.
 - Writes allowed: **only** `docs/plans/` (design docs / notes).
 - Writes not allowed: source code, tests, config, extensions, etc.
+- Expected artifact content: a validated design plus a **universal goal summary** describing objective, constraints, success signals, verification checks, scope/off-limits, execution mode hint, and stop conditions.
 
 Recommended skill:
 - `/skill:brainstorming`
+
+See also:
+- [`docs/goal-template.md`](goal-template.md)
+- [`docs/autoresearch-integration.md`](autoresearch-integration.md)
 
 ### Plan (thinking phase)
 - Goal: produce an executable implementation plan.
 - Writes allowed: **only** `docs/plans/` (the plan document).
 - Writes not allowed: source code, tests, config, etc.
+- Expected artifact content: a carried-forward goal summary plus an explicit execution mode (`standard`, `debugging`, `operations`, `autoresearch`, etc.).
 
 Recommended skill:
 - `/skill:writing-plans`
@@ -29,6 +35,7 @@ Recommended skill:
 ### Execute
 - Goal: implement tasks.
 - Normal code/test edits allowed.
+- For measurable optimization work, execution may intentionally hand off into an **autoresearch lane** rather than a normal linear task flow.
 
 Recommended skills:
 - `/skill:executing-plans` (batch execution)
