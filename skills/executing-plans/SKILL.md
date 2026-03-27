@@ -26,8 +26,10 @@ If a tool result contains a ⚠️ workflow warning, stop immediately and addres
 ### Step 1: Load and Review Plan
 1. Read plan file
 2. Review critically - identify any questions or concerns about the plan
-3. If concerns: Raise them with your human partner before starting
-4. If no concerns: Initialize the `plan_tracker` tool and proceed
+3. Identify the plan's stated execution mode
+4. If the plan explicitly selects `autoresearch` and the autoresearch tooling/skills are available, stop normal execution and hand off into that lane instead of forcing a standard task batch
+5. If concerns: Raise them with your human partner before starting
+6. If no concerns: Initialize the `plan_tracker` tool and proceed
 
 ### Step 2: Execute Batch
 **Default: First 3 tasks**
@@ -87,6 +89,8 @@ After all tasks complete and verified:
 ## Remember
 - TDD is the default for production code: failing test first, verify fail, implement, verify pass
 - Review plan critically first
+- Respect the plan's execution mode
+- If the plan is an autoresearch plan, don't flatten it into ordinary task execution
 - Follow plan steps exactly
 - Don't skip verifications
 - Reference skills when plan says to

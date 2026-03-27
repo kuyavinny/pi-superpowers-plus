@@ -48,6 +48,17 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Tech Stack:** [Key technologies/libraries]
 
+**Execution Mode:** [standard | debugging | operations | autoresearch]
+
+## Goal Summary
+- **Objective:** [desired outcome]
+- **Why it matters:** [why the user wants this]
+- **Constraints:** [hard boundaries / risks]
+- **Success signals:** [observable signs of progress]
+- **Verification checks:** [what must pass before claiming success]
+- **Scope / Off-limits:** [what may and may not be touched]
+- **Stop conditions:** [when to stop or escalate]
+
 ---
 ```
 
@@ -101,6 +112,9 @@ git commit -m "feat: add specific feature"
 - Complete code in plan (not "add validation")
 - Exact commands with expected output
 - Reference relevant skills
+- Carry forward the validated goal summary from brainstorming
+- State the execution mode explicitly
+- If execution mode is `autoresearch`, include the measurable signal, benchmark command, files in scope, and stop conditions needed to hand off into that lane cleanly
 - DRY, YAGNI, TDD, frequent commits
 - Order tasks so each task's dependencies are completed by earlier tasks
 - If plan exceeds ~8 tasks, consider splitting into phases with a checkpoint between them
