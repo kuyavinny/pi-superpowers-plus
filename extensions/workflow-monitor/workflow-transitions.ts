@@ -1,5 +1,5 @@
-import type { Phase, TransitionBoundary } from "./workflow-tracker";
 import type { GoalExecutionMode } from "./goal-artifacts";
+import type { Phase, TransitionBoundary } from "./workflow-tracker";
 
 export type TransitionChoice = "next" | "fresh" | "skip" | "discuss";
 
@@ -39,9 +39,10 @@ export function getTransitionPrompt(
     case "plan_ready":
       return {
         boundary,
-        title: context.executionMode === "autoresearch"
-          ? "Plan ready for autoresearch. What next?"
-          : "Plan ready. What next?",
+        title:
+          context.executionMode === "autoresearch"
+            ? "Plan ready for autoresearch. What next?"
+            : "Plan ready. What next?",
         nextPhase: "execute",
         artifactPath,
         options: BASE_OPTIONS,

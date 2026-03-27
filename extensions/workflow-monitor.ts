@@ -16,6 +16,7 @@ import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { log } from "./logging.js";
 import { getCurrentGitRef } from "./workflow-monitor/git";
+import { parseGoalArtifact } from "./workflow-monitor/goal-artifacts";
 import { loadReference, REFERENCE_TOPICS } from "./workflow-monitor/reference-tool";
 import { getUnresolvedPhases, getUnresolvedPhasesBefore } from "./workflow-monitor/skip-confirmation";
 import { parseTestCommand, parseTestResult } from "./workflow-monitor/test-runner";
@@ -37,7 +38,6 @@ import {
   WORKFLOW_TRACKER_ENTRY_TYPE,
   type WorkflowTrackerState,
 } from "./workflow-monitor/workflow-tracker";
-import { parseGoalArtifact } from "./workflow-monitor/goal-artifacts";
 import { getTransitionPrompt } from "./workflow-monitor/workflow-transitions";
 
 type SelectOption<T extends string> = { label: string; value: T };
@@ -496,9 +496,8 @@ export default function (pi: ExtensionAPI) {
         }
 
         if (isPlansWrite && /-(design|implementation)\.md$/.test(resolved)) {
-          const content = event.toolName === "write"
-            ? (input.content as string | undefined)
-            : (input.newText as string | undefined);
+          const content =
+            event.toolName === "write" ? (input.content as string | undefined) : (input.newText as string | undefined);
           if (content) {
             const parsed = parseGoalArtifact(content);
             if (parsed.missingSections.length > 0) {

@@ -33,12 +33,7 @@ describe("parseGoalArtifact", () => {
 `;
 
     expect(parseGoalArtifact(markdown)).toEqual({
-      missingSections: [
-        "Why it matters",
-        "Success signals",
-        "Scope / Off-limits",
-        "Stop conditions",
-      ],
+      missingSections: ["Why it matters", "Success signals", "Scope / Off-limits", "Stop conditions"],
       executionMode: null,
     });
   });
