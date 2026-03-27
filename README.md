@@ -124,11 +124,13 @@ The skills guide the agent through a consistent development cycle:
 Brainstorm → Plan → Execute → Verify → Review → Finish
 ```
 
+A new cross-cutting idea in this package is **goal awareness**: the workflow should not only enforce process discipline, but also preserve the user's real objective, constraints, and success criteria throughout execution. See [`docs/goal-template.md`](docs/goal-template.md).
+
 | Phase | Skill | What Happens |
 |-------|-------|--------------|
-| **Brainstorm** | `/skill:brainstorming` | Refines your idea into a design document via Socratic dialogue |
-| **Plan** | `/skill:writing-plans` | Breaks the design into bite-sized TDD tasks with exact file paths and code |
-| **Execute** | `/skill:executing-plans` or `/skill:subagent-driven-development` | Works through tasks in batches with review checkpoints |
+| **Brainstorm** | `/skill:brainstorming` | Refines your idea into a design document via Socratic dialogue and captures the universal goal summary |
+| **Plan** | `/skill:writing-plans` | Breaks the design into bite-sized TDD tasks with exact file paths and carries forward the goal + execution mode |
+| **Execute** | `/skill:executing-plans` or `/skill:subagent-driven-development` | Works through tasks in batches with review checkpoints, or can hand off to an autoresearch lane for measurable optimization work |
 | **Verify** | `/skill:verification-before-completion` | Runs tests and proves everything works - evidence before claims |
 | **Review** | `/skill:requesting-code-review` | Dispatches a reviewer subagent to catch issues before merge |
 | **Finish** | `/skill:finishing-a-development-branch` | Presents merge/PR/keep/discard options and cleans up |
@@ -140,6 +142,8 @@ The **workflow tracker** shows progress in the TUI status bar as the agent moves
 ```
 
 Phases are detected automatically from skill invocations, artifact writes under `docs/plans/`, and plan tracker initialization. At phase boundaries, the agent is prompted (once) with options to continue, start a fresh session, skip, or discuss.
+
+For optimization-heavy work, the workflow can intentionally choose an **autoresearch lane** instead of a standard linear execution path. See [`docs/autoresearch-integration.md`](docs/autoresearch-integration.md).
 
 ### Supporting Skills
 

@@ -72,7 +72,7 @@ export const SKILL_TO_PHASE: Record<string, Phase> = {
 
 const PLANS_DIR_RE = /^docs\/plans\//;
 const DESIGN_RE = /-design\.md$/;
-const IMPLEMENTATION_RE = /-implementation\.md$/;
+const MARKDOWN_RE = /\.md$/;
 
 export class WorkflowTracker {
   private state: WorkflowTrackerState = emptyState();
@@ -178,7 +178,7 @@ export class WorkflowTracker {
   }
 
   onFileWritten(path: string): boolean {
-    if (!PLANS_DIR_RE.test(path)) return false;
+    if (!PLANS_DIR_RE.test(path) || !MARKDOWN_RE.test(path)) return false;
 
     if (DESIGN_RE.test(path)) {
       const changedArtifact = this.recordArtifact("brainstorm", path);
@@ -186,13 +186,9 @@ export class WorkflowTracker {
       return changedArtifact || changedPhase;
     }
 
-    if (IMPLEMENTATION_RE.test(path)) {
-      const changedArtifact = this.recordArtifact("plan", path);
-      const changedPhase = this.advanceTo("plan");
-      return changedArtifact || changedPhase;
-    }
-
-    return false;
+    const changedArtifact = this.recordArtifact("plan", path);
+    const changedPhase = this.advanceTo("plan");
+    return changedArtifact || changedPhase;
   }
 
   onPlanTrackerInit(): boolean {

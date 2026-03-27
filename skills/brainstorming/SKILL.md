@@ -34,6 +34,7 @@ Start by understanding the current project context, then ask questions one at a 
 - Prefer multiple choice questions when possible, but open-ended is fine too
 - Only one question per message - if a topic needs more exploration, break it into multiple questions
 - Focus on understanding: purpose, constraints, success criteria
+- Capture a **universal goal summary** as part of the design: objective, why it matters, constraints, success signals, verification checks, scope/off-limits, execution mode hint, and stop conditions
 
 **Exploring approaches:**
 - Propose 2-3 different approaches with trade-offs
@@ -45,12 +46,14 @@ Start by understanding the current project context, then ask questions one at a 
 - Break it into sections of 200-300 words
 - Ask after each section whether it looks right so far
 - Cover: architecture, components, data flow, error handling, testing
+- Include the validated universal goal summary in the final design
 - Be ready to go back and clarify if something doesn't make sense
 
 ## After the Design
 
 **Documentation:**
 - Write the validated design to `docs/plans/YYYY-MM-DD-<topic>-design.md`
+- The design doc must include a clearly labeled goal section with: Objective, Why it matters, Constraints, Success signals, Verification checks, Scope / Off-limits, Execution mode hint, and Stop conditions
 - Commit the design document to git
 - Mark the brainstorm phase complete: call `plan_tracker` with `{action: "update", status: "complete"}` for the current phase
 

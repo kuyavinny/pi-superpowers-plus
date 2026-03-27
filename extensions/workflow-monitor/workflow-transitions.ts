@@ -1,3 +1,4 @@
+import type { GoalExecutionMode } from "./goal-artifacts";
 import type { Phase, TransitionBoundary } from "./workflow-tracker";
 
 export type TransitionChoice = "next" | "fresh" | "skip" | "discuss";
@@ -10,6 +11,10 @@ export interface TransitionPrompt {
   options: { choice: TransitionChoice; label: string }[];
 }
 
+export interface TransitionPromptContext {
+  executionMode?: GoalExecutionMode;
+}
+
 const BASE_OPTIONS: TransitionPrompt["options"] = [
   { choice: "next", label: "Next step (this session)" },
   { choice: "fresh", label: "Fresh session → next step" },
@@ -17,7 +22,11 @@ const BASE_OPTIONS: TransitionPrompt["options"] = [
   { choice: "discuss", label: "Discuss" },
 ];
 
-export function getTransitionPrompt(boundary: TransitionBoundary, artifactPath: string | null): TransitionPrompt {
+export function getTransitionPrompt(
+  boundary: TransitionBoundary,
+  artifactPath: string | null,
+  context: TransitionPromptContext = {},
+): TransitionPrompt {
   switch (boundary) {
     case "design_committed":
       return {
@@ -30,7 +39,10 @@ export function getTransitionPrompt(boundary: TransitionBoundary, artifactPath: 
     case "plan_ready":
       return {
         boundary,
-        title: "Plan ready. What next?",
+        title:
+          context.executionMode === "autoresearch"
+            ? "Plan ready for autoresearch. What next?"
+            : "Plan ready. What next?",
         nextPhase: "execute",
         artifactPath,
         options: BASE_OPTIONS,

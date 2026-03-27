@@ -236,6 +236,14 @@ describe("WorkflowTracker detection helpers", () => {
     expect(s.artifacts.plan).toBe("docs/plans/2026-02-11-foo-implementation.md");
   });
 
+  test("detects writing a plain plan artifact and advances to plan", () => {
+    const tracker = new WorkflowTracker();
+    tracker.onFileWritten("docs/plans/2026-02-11-foo.md");
+    const s = tracker.getState();
+    expect(s.currentPhase).toBe("plan");
+    expect(s.artifacts.plan).toBe("docs/plans/2026-02-11-foo.md");
+  });
+
   test("detects plan_tracker init and advances to execute", () => {
     const tracker = new WorkflowTracker();
     tracker.onPlanTrackerInit();
