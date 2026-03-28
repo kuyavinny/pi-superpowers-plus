@@ -47,11 +47,11 @@ subagent({
 subagent({
   agent: "code-reviewer",
   task: "Review the auth feature",
-  model: "gpt-5-mini",
+  model: "openai-codex/gpt-5-mini",
 })
 ```
 
-If `model` is provided, that explicit override wins.
+If `model` is provided, that explicit override wins. Prefer provider-qualified IDs. Bare built-in IDs are normalized before launch so `gemini-2.5-flash` becomes `google-gemini-cli/gemini-2.5-flash` instead of relying on provider inference.
 
 ## Selection visibility
 
@@ -108,6 +108,7 @@ Policy refinement follows a hybrid promotion model:
 ## Notes
 
 - Bundled agents no longer hard-pin a single model in frontmatter.
+- Bundled policy-selected models are stored as provider-qualified IDs.
 - Dynamic selection currently targets the bundled agent names:
   - `implementer`
   - `worker`

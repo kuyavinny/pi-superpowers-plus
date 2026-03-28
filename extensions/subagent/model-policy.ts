@@ -115,7 +115,7 @@ export function validateModelPolicy(policy: SubagentModelPolicy): string[] {
 export const BUNDLED_SUBAGENT_MODEL_POLICY: SubagentModelPolicy = {
   models: [
     {
-      id: "claude-haiku-3-5",
+      id: "anthropic/claude-haiku-3-5",
       reasoning: "medium",
       codingReliability: "medium",
       reviewDepth: "medium",
@@ -123,7 +123,7 @@ export const BUNDLED_SUBAGENT_MODEL_POLICY: SubagentModelPolicy = {
       costTier: "cheap",
     },
     {
-      id: "gemini-2.5-flash",
+      id: "google-gemini-cli/gemini-2.5-flash",
       reasoning: "high",
       codingReliability: "medium",
       reviewDepth: "high",
@@ -131,7 +131,7 @@ export const BUNDLED_SUBAGENT_MODEL_POLICY: SubagentModelPolicy = {
       costTier: "cheap",
     },
     {
-      id: "claude-sonnet-4-5",
+      id: "anthropic/claude-sonnet-4-5",
       reasoning: "very_high",
       codingReliability: "very_high",
       reviewDepth: "very_high",
@@ -139,7 +139,7 @@ export const BUNDLED_SUBAGENT_MODEL_POLICY: SubagentModelPolicy = {
       costTier: "expensive",
     },
     {
-      id: "gpt-5-mini",
+      id: "openai-codex/gpt-5-mini",
       reasoning: "high",
       codingReliability: "high",
       reviewDepth: "high",

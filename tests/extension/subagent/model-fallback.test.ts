@@ -48,7 +48,15 @@ describe("dynamic model fallback", () => {
     vi.clearAllMocks();
     process.env.PI_SUBAGENT_DYNAMIC_MODEL_SELECTION = "1";
     discoverAgentsMock.mockReturnValue({
-      agents: [{ name: "implementer", source: "project", filePath: "/tmp/implementer.md", systemPrompt: "", model: "static-model" }],
+      agents: [
+        {
+          name: "implementer",
+          source: "project",
+          filePath: "/tmp/implementer.md",
+          systemPrompt: "",
+          model: "openai-codex/static-model",
+        },
+      ],
       projectAgentsDir: null,
     });
   });
@@ -59,7 +67,7 @@ describe("dynamic model fallback", () => {
 
   test("falls back to the next eligible model when the selected model is reported unavailable", async () => {
     spawnMock
-      .mockImplementationOnce(() => createFakeProcess(1, "Model gpt-5-mini not found"))
+      .mockImplementationOnce(() => createFakeProcess(1, "Model openai-codex/gpt-5-mini not found"))
       .mockImplementationOnce(() => createFakeProcess(0));
 
     const tool = registerTool();
@@ -72,9 +80,9 @@ describe("dynamic model fallback", () => {
     );
 
     expect(spawnMock).toHaveBeenCalledTimes(2);
-    expect(spawnMock.mock.calls[0][1]).toContain("gpt-5-mini");
-    expect(spawnMock.mock.calls[1][1]).toContain("claude-sonnet-4-5");
-    expect(result.details.selection.selectedModel).toBe("claude-sonnet-4-5");
-    expect(result.details.selection.fallbackReason).toBe("gpt-5-mini unavailable");
+    expect(spawnMock.mock.calls[0][1]).toContain("openai-codex/gpt-5-mini");
+    expect(spawnMock.mock.calls[1][1]).toContain("anthropic/claude-sonnet-4-5");
+    expect(result.details.selection.selectedModel).toBe("anthropic/claude-sonnet-4-5");
+    expect(result.details.selection.fallbackReason).toBe("openai-codex/gpt-5-mini unavailable");
   });
 });

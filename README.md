@@ -325,6 +325,8 @@ subagent({
 })
 ```
 
+When you provide a `model` override, prefer provider-qualified IDs such as `openai-codex/gpt-5.4` or `google-gemini-cli/gemini-2.5-flash`. Bare built-in IDs are normalized before launch.
+
 See [`docs/subagent-model-selection.md`](docs/subagent-model-selection.md) for details.
 
 ### Custom Agents
@@ -336,7 +338,7 @@ Add `.md` files to an `agents/` directory at your project root. They override bu
 name: my-agent
 description: What this agent does
 tools: read, write, edit, bash
-model: claude-sonnet-4-5   # Optional: pin a model, or omit to use the environment default / selector behavior
+model: anthropic/claude-sonnet-4-5   # Optional: pin a provider-qualified model, or omit to use the environment default / selector behavior
 extensions: ../extensions/my-guard.ts
 ---
 

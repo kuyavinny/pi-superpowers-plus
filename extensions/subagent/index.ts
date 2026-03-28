@@ -31,6 +31,7 @@ import {
   BUNDLED_SUBAGENT_MODEL_POLICY,
   type SubagentGrade,
 } from "./model-policy.js";
+import { qualifyModelReference } from "./model-resolution.js";
 import {
   describeModelSelection,
   getAgentTypeForAgentName,
@@ -350,6 +351,31 @@ async function runSingleAgent(
     selectedModel = decision.selectedModelId;
     selectionReason = decision.selectionReason;
     fallbackReason = decision.fallbackReason;
+  }
+
+  if (selectedModel) {
+    try {
+      selectedModel = qualifyModelReference(selectedModel);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return {
+        agent: agentName,
+        agentSource: agent.source,
+        task: invocation.task,
+        exitCode: 1,
+        messages: [],
+        stderr: errorMessage,
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+        step,
+        errorMessage,
+        model: selectedModel,
+        requestedModel: invocation.requestedModel,
+        suggestedGrade: invocation.suggestedGrade,
+        finalGrade: invocation.finalGrade,
+        selectionReason,
+        fallbackReason,
+      };
+    }
   }
 
   const args: string[] = ["--mode", "json", "-p", "--no-session"];
