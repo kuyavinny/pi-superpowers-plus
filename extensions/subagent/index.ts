@@ -27,6 +27,8 @@ import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
 import { getSubagentConcurrency, Semaphore } from "./concurrency.js";
 import { buildSubagentEnv } from "./env.js";
 import { ProcessTracker } from "./lifecycle.js";
+import type { SubagentGrade } from "./model-policy.js";
+import { decideTaskGrade } from "./task-grading.js";
 import { getSubagentTimeoutMs } from "./timeout.js";
 
 const MAX_PARALLEL_TASKS = 8;
@@ -152,10 +154,21 @@ interface SingleResult {
   stderr: string;
   usage: UsageStats;
   model?: string;
+  requestedModel?: string;
+  suggestedGrade?: SubagentGrade;
+  finalGrade?: SubagentGrade;
   stopReason?: string;
   errorMessage?: string;
   tddViolations?: number;
   step?: number;
+}
+
+interface InvocationRequest {
+  task: string;
+  cwd?: string;
+  requestedModel?: string;
+  suggestedGrade: SubagentGrade;
+  finalGrade: SubagentGrade;
 }
 
 interface SubagentDetails {
@@ -262,8 +275,7 @@ async function runSingleAgent(
   defaultCwd: string,
   agents: AgentConfig[],
   agentName: string,
-  task: string,
-  cwd: string | undefined,
+  invocation: InvocationRequest,
   step: number | undefined,
   signal: AbortSignal | undefined,
   onUpdate: OnUpdateCallback | undefined,
@@ -278,7 +290,7 @@ async function runSingleAgent(
     return {
       agent: agentName,
       agentSource: "unknown",
-      task,
+      task: invocation.task,
       exitCode: 1,
       messages: [],
       stderr: `Unknown agent: "${agentName}". Available agents: ${available}.`,
@@ -288,7 +300,7 @@ async function runSingleAgent(
   }
 
   const args: string[] = ["--mode", "json", "-p", "--no-session"];
-  if (agent.model) args.push("--model", agent.model);
+  if (invocation.requestedModel ?? agent.model) args.push("--model", invocation.requestedModel ?? agent.model);
   if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
   if (agent.extensions) {
     for (const ext of agent.extensions) {
@@ -304,12 +316,15 @@ async function runSingleAgent(
   const currentResult: SingleResult = {
     agent: agentName,
     agentSource: agent.source,
-    task,
+    task: invocation.task,
     exitCode: 0,
     messages: [],
     stderr: "",
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
-    model: agent.model,
+    model: invocation.requestedModel ?? agent.model,
+    requestedModel: invocation.requestedModel,
+    suggestedGrade: invocation.suggestedGrade,
+    finalGrade: invocation.finalGrade,
     step,
   };
 
@@ -335,9 +350,9 @@ async function runSingleAgent(
       args.push("--append-system-prompt", tmpPromptPath);
     }
 
-    args.push(`Task: ${task}`);
+    args.push(`Task: ${invocation.task}`);
 
-    const resolvedCwd = path.resolve(cwd ?? defaultCwd);
+    const resolvedCwd = path.resolve(invocation.cwd ?? defaultCwd);
     let cwdError: string | undefined;
     try {
       const stat = fs.statSync(resolvedCwd);
@@ -349,7 +364,7 @@ async function runSingleAgent(
       return {
         agent: agentName,
         agentSource: agent.source,
-        task,
+        task: invocation.task,
         exitCode: 1,
         messages: [],
         stderr: cwdError,
@@ -542,12 +557,20 @@ const TaskItem = Type.Object({
   agent: Type.String({ description: "Name of the agent to invoke" }),
   task: Type.String({ description: "Task to delegate to the agent" }),
   cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
+  grade: Type.Optional(
+    StringEnum(["light", "standard", "heavy", "deep"] as const, { description: "Task grade override" }),
+  ),
+  model: Type.Optional(Type.String({ description: "Model override" })),
 });
 
 const ChainItem = Type.Object({
   agent: Type.String({ description: "Name of the agent to invoke" }),
   task: Type.String({ description: "Task with optional {previous} placeholder for prior output" }),
   cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
+  grade: Type.Optional(
+    StringEnum(["light", "standard", "heavy", "deep"] as const, { description: "Task grade override" }),
+  ),
+  model: Type.Optional(Type.String({ description: "Model override" })),
 });
 
 const AgentScopeSchema = StringEnum(["user", "project", "both"] as const, {
@@ -558,6 +581,10 @@ const AgentScopeSchema = StringEnum(["user", "project", "both"] as const, {
 const SubagentParams = Type.Object({
   agent: Type.Optional(Type.String({ description: "Name of the agent to invoke (for single mode)" })),
   task: Type.Optional(Type.String({ description: "Task to delegate (for single mode)" })),
+  grade: Type.Optional(
+    StringEnum(["light", "standard", "heavy", "deep"] as const, { description: "Task grade override" }),
+  ),
+  model: Type.Optional(Type.String({ description: "Model override" })),
   tasks: Type.Optional(Type.Array(TaskItem, { description: "Array of {agent, task} for parallel execution" })),
   chain: Type.Optional(Type.Array(ChainItem, { description: "Array of {agent, task} for sequential execution" })),
   agentScope: Type.Optional(AgentScopeSchema),
@@ -603,6 +630,22 @@ export default function (pi: ExtensionAPI) {
           projectAgentsDir: discovery.projectAgentsDir,
           results,
         });
+
+      const buildInvocationRequest = (
+        task: string,
+        cwd: string | undefined,
+        grade: SubagentGrade | undefined,
+        model: string | undefined,
+      ): InvocationRequest => {
+        const gradeDecision = decideTaskGrade({ task }, grade);
+        return {
+          task,
+          cwd,
+          requestedModel: model,
+          suggestedGrade: gradeDecision.suggestedGrade,
+          finalGrade: gradeDecision.finalGrade,
+        };
+      };
 
       if (modeCount !== 1) {
         const available = agents.map((a) => `${a.name} (${a.source})`).join(", ") || "none";
@@ -669,8 +712,7 @@ export default function (pi: ExtensionAPI) {
             ctx.cwd,
             agents,
             step.agent,
-            taskWithContext,
-            step.cwd,
+            buildInvocationRequest(taskWithContext, step.cwd, step.grade, step.model),
             i + 1,
             signal,
             chainUpdate,
@@ -741,8 +783,7 @@ export default function (pi: ExtensionAPI) {
             ctx.cwd,
             agents,
             t.agent,
-            t.task,
-            t.cwd,
+            buildInvocationRequest(t.task, t.cwd, t.grade, t.model),
             undefined,
             signal,
             // Per-task update callback
@@ -783,8 +824,7 @@ export default function (pi: ExtensionAPI) {
           ctx.cwd,
           agents,
           params.agent,
-          params.task,
-          params.cwd,
+          buildInvocationRequest(params.task, params.cwd, params.grade, params.model),
           undefined,
           signal,
           onUpdate,
