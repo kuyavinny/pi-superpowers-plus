@@ -37,6 +37,7 @@ import {
   selectModelForInvocation,
 } from "./model-selector.js";
 import { decideTaskGrade } from "./task-grading.js";
+import { appendTelemetryRecord, buildTelemetryRecord } from "./telemetry.js";
 import { getSubagentTimeoutMs } from "./timeout.js";
 
 const MAX_PARALLEL_TASKS = 8;
@@ -391,6 +392,9 @@ async function runSingleAgent(
     }
   };
 
+  const startedAt = Date.now();
+  const telemetryCwd = path.resolve(invocation.cwd ?? defaultCwd);
+
   if (semaphore.active >= semaphore.limit) {
     log.debug(`Subagent queued — ${semaphore.active}/${semaphore.limit} slots in use`);
   }
@@ -406,7 +410,7 @@ async function runSingleAgent(
 
     args.push(`Task: ${invocation.task}`);
 
-    const resolvedCwd = path.resolve(invocation.cwd ?? defaultCwd);
+    const resolvedCwd = telemetryCwd;
     let cwdError: string | undefined;
     try {
       const stat = fs.statSync(resolvedCwd);
@@ -612,6 +616,26 @@ async function runSingleAgent(
         semaphore,
       );
     }
+
+    appendTelemetryRecord(
+      telemetryCwd,
+      buildTelemetryRecord({
+        cwd: telemetryCwd,
+        agent: currentResult.agent,
+        task: currentResult.task,
+        suggestedGrade: currentResult.suggestedGrade,
+        finalGrade: currentResult.finalGrade,
+        selectedModel: currentResult.model,
+        requestedModel: currentResult.requestedModel,
+        fallbackReason: currentResult.fallbackReason,
+        selectionReason: currentResult.selectionReason,
+        exitCode: currentResult.exitCode,
+        durationMs: Date.now() - startedAt,
+        retries: invocation.unavailableModels?.length ?? 0,
+        reviewRejections: 0,
+        usage: currentResult.usage,
+      }),
+    );
 
     return currentResult;
   } finally {
