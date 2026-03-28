@@ -179,6 +179,8 @@ interface InvocationRequest {
   requestedModel?: string;
   suggestedGrade: SubagentGrade;
   finalGrade: SubagentGrade;
+  allowDynamicSelection: boolean;
+  unavailableModels?: string[];
 }
 
 interface SubagentDetails {
@@ -320,12 +322,14 @@ async function runSingleAgent(
   let fallbackReason: string | undefined;
 
   const agentType = getAgentTypeForAgentName(agent.name);
-  if (!invocation.requestedModel && isDynamicModelSelectionEnabled() && agentType) {
+  if (!invocation.requestedModel && invocation.allowDynamicSelection && agentType) {
+    const unavailableModels = new Set(invocation.unavailableModels ?? []);
     const decision = selectModelForInvocation({
       policy: BUNDLED_SUBAGENT_MODEL_POLICY,
       agentType,
       suggestedGrade: invocation.suggestedGrade,
       finalGrade: invocation.finalGrade,
+      isModelAvailable: (modelId) => !unavailableModels.has(modelId),
     });
     if (decision.error) {
       return {
@@ -583,6 +587,32 @@ async function runSingleAgent(
     }
     currentResult.tddViolations = tddViolations;
     if (wasAborted) throw new Error("Subagent was aborted");
+
+    const modelNotFound =
+      currentResult.exitCode !== 0 &&
+      invocation.allowDynamicSelection &&
+      agentType &&
+      currentResult.model &&
+      /model\s+.+\s+not found/i.test(currentResult.stderr);
+
+    if (modelNotFound) {
+      return runSingleAgent(
+        defaultCwd,
+        agents,
+        agentName,
+        {
+          ...invocation,
+          unavailableModels: [...(invocation.unavailableModels ?? []), currentResult.model],
+        },
+        step,
+        signal,
+        onUpdate,
+        makeDetails,
+        processTracker,
+        semaphore,
+      );
+    }
+
     return currentResult;
   } finally {
     release();
@@ -686,6 +716,7 @@ export default function (pi: ExtensionAPI) {
         cwd: string | undefined,
         grade: SubagentGrade | undefined,
         model: string | undefined,
+        allowDynamicSelection: boolean,
       ): InvocationRequest => {
         const gradeDecision = decideTaskGrade({ task }, grade);
         return {
@@ -694,6 +725,8 @@ export default function (pi: ExtensionAPI) {
           requestedModel: model,
           suggestedGrade: gradeDecision.suggestedGrade,
           finalGrade: gradeDecision.finalGrade,
+          allowDynamicSelection,
+          unavailableModels: [],
         };
       };
 
@@ -762,7 +795,7 @@ export default function (pi: ExtensionAPI) {
             ctx.cwd,
             agents,
             step.agent,
-            buildInvocationRequest(taskWithContext, step.cwd, step.grade, step.model),
+            buildInvocationRequest(taskWithContext, step.cwd, step.grade, step.model, false),
             i + 1,
             signal,
             chainUpdate,
@@ -833,7 +866,7 @@ export default function (pi: ExtensionAPI) {
             ctx.cwd,
             agents,
             t.agent,
-            buildInvocationRequest(t.task, t.cwd, t.grade, t.model),
+            buildInvocationRequest(t.task, t.cwd, t.grade, t.model, false),
             undefined,
             signal,
             // Per-task update callback
@@ -874,7 +907,13 @@ export default function (pi: ExtensionAPI) {
           ctx.cwd,
           agents,
           params.agent,
-          buildInvocationRequest(params.task, params.cwd, params.grade, params.model),
+          buildInvocationRequest(
+            params.task,
+            params.cwd,
+            params.grade,
+            params.model,
+            isDynamicModelSelectionEnabled(),
+          ),
           undefined,
           signal,
           onUpdate,
