@@ -277,7 +277,7 @@ A bundled `subagent` tool lets the orchestrating agent spawn isolated subprocess
 | `code-reviewer` | Production readiness review | read, bash (read-only) | — |
 | `spec-reviewer` | Plan/spec compliance check | read, bash (read-only) | — |
 
-Agent definitions live in `agents/*.md` and use YAML frontmatter to declare tools, model, extensions, and a system prompt body.
+Agent definitions live in `agents/*.md` and use YAML frontmatter to declare tools, optional model pins, extensions, and a system prompt body.
 
 ### Single Agent
 
@@ -302,6 +302,30 @@ Single-agent results include:
 - `filesChanged` — list of files written/edited
 - `testsRan` — whether any test commands were executed
 - `status` — `"completed"` or `"failed"`
+- `selection` — selected model, grade, and fallback/override summary when available
+
+### Dynamic Model Selection
+
+Bundled subagents support deterministic dynamic model selection for single-mode invocations.
+
+- Enable with `PI_SUBAGENT_DYNAMIC_MODEL_SELECTION=1`
+- The tool suggests a task grade (`light`, `standard`, `heavy`, `deep`)
+- Optional overrides: `grade`, `model`
+- The selector chooses the lowest-cost eligible model that still satisfies the capability floor
+- If the selected model is unavailable, it falls back to the next eligible model
+- Telemetry is written best-effort to `.pi/subagent/telemetry.jsonl`
+
+Example:
+
+```ts
+subagent({
+  agent: "implementer",
+  task: "Implement retry handling in src/auth.ts",
+  grade: "standard",
+})
+```
+
+See [`docs/subagent-model-selection.md`](docs/subagent-model-selection.md) for details.
 
 ### Custom Agents
 
@@ -312,7 +336,7 @@ Add `.md` files to an `agents/` directory at your project root. They override bu
 name: my-agent
 description: What this agent does
 tools: read, write, edit, bash
-model: claude-sonnet-4-5
+model: claude-sonnet-4-5   # Optional: pin a model, or omit to use the environment default / selector behavior
 extensions: ../extensions/my-guard.ts
 ---
 
@@ -367,7 +391,12 @@ pi-superpowers-plus/
 │   │   └── reference-tool.ts        # On-demand reference loading
 │   └── subagent/
 │       ├── index.ts                   # Subagent tool registration + execution
-│       └── agents.ts                  # Agent discovery + frontmatter parsing
+│       ├── agents.ts                  # Agent discovery + frontmatter parsing
+│       ├── model-policy.ts            # Shared model catalog + capability policy
+│       ├── task-grading.ts            # Heuristic task grade suggestion + overrides
+│       ├── model-selector.ts          # Deterministic capability/cost-based selection
+│       ├── telemetry.ts               # Local telemetry for policy refinement
+│       └── promotion.ts               # Policy eval + promotion helpers
 ├── skills/                           # 12 workflow skills (24 markdown files)
 │   ├── brainstorming/
 │   ├── writing-plans/
