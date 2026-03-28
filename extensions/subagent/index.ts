@@ -959,17 +959,20 @@ export default function (pi: ExtensionAPI) {
           testsRan: summary.testsRan,
           tddViolations: result.tddViolations ?? 0,
           selection: result.suggestedGrade && result.finalGrade
-            ? describeModelSelection(getAgentTypeForAgentName(result.agent) ?? "worker", {
-                agentType: getAgentTypeForAgentName(result.agent) ?? "worker",
-                suggestedGrade: result.suggestedGrade,
-                finalGrade: result.finalGrade,
-                selectedModelId: result.model,
-                eligibleModels: [],
-                requiredCapabilities: {},
-                overrideUsed: Boolean(result.requestedModel),
-                fallbackReason: result.fallbackReason,
-                selectionReason: result.selectionReason ?? "static agent model",
-              })
+            ? {
+                ...describeModelSelection((getAgentTypeForAgentName(result.agent) ?? "worker") as "implementer" | "code-reviewer" | "spec-reviewer" | "worker", {
+                  agentType: (getAgentTypeForAgentName(result.agent) ?? "worker") as "implementer" | "code-reviewer" | "spec-reviewer" | "worker",
+                  suggestedGrade: result.suggestedGrade,
+                  finalGrade: result.finalGrade,
+                  selectedModelId: result.model,
+                  eligibleModels: [],
+                  requiredCapabilities: {},
+                  overrideUsed: Boolean(result.requestedModel),
+                  fallbackReason: result.fallbackReason,
+                  selectionReason: result.selectionReason ?? "static agent model",
+                }),
+                agentType: result.agent,
+              }
             : undefined,
         };
         const isError = result.exitCode !== 0 || result.stopReason === "error" || result.stopReason === "aborted";
