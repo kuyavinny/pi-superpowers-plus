@@ -27,7 +27,15 @@ import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
 import { getSubagentConcurrency, Semaphore } from "./concurrency.js";
 import { buildSubagentEnv } from "./env.js";
 import { ProcessTracker } from "./lifecycle.js";
-import type { SubagentGrade } from "./model-policy.js";
+import {
+  BUNDLED_SUBAGENT_MODEL_POLICY,
+  type SubagentGrade,
+} from "./model-policy.js";
+import {
+  describeModelSelection,
+  getAgentTypeForAgentName,
+  selectModelForInvocation,
+} from "./model-selector.js";
 import { decideTaskGrade } from "./task-grading.js";
 import { getSubagentTimeoutMs } from "./timeout.js";
 
@@ -157,6 +165,8 @@ interface SingleResult {
   requestedModel?: string;
   suggestedGrade?: SubagentGrade;
   finalGrade?: SubagentGrade;
+  selectionReason?: string;
+  fallbackReason?: string;
   stopReason?: string;
   errorMessage?: string;
   tddViolations?: number;
@@ -240,7 +250,13 @@ function collectSummary(messages: Message[]): { filesChanged: string[]; testsRan
   return { filesChanged: Array.from(files), testsRan };
 }
 
-export const __internal = { collectSummary };
+const DYNAMIC_SELECTION_ENV_VAR = "PI_SUBAGENT_DYNAMIC_MODEL_SELECTION";
+
+function isDynamicModelSelectionEnabled(): boolean {
+  return process.env[DYNAMIC_SELECTION_ENV_VAR] === "1";
+}
+
+export const __internal = { collectSummary, isDynamicModelSelectionEnabled };
 
 async function mapWithConcurrencyLimit<TIn, TOut>(
   items: TIn[],
@@ -299,8 +315,40 @@ async function runSingleAgent(
     };
   }
 
+  let selectedModel = invocation.requestedModel ?? agent.model;
+  let selectionReason = invocation.requestedModel ? "requested model override" : undefined;
+  let fallbackReason: string | undefined;
+
+  const agentType = getAgentTypeForAgentName(agent.name);
+  if (!invocation.requestedModel && isDynamicModelSelectionEnabled() && agentType) {
+    const decision = selectModelForInvocation({
+      policy: BUNDLED_SUBAGENT_MODEL_POLICY,
+      agentType,
+      suggestedGrade: invocation.suggestedGrade,
+      finalGrade: invocation.finalGrade,
+    });
+    if (decision.error) {
+      return {
+        agent: agentName,
+        agentSource: agent.source,
+        task: invocation.task,
+        exitCode: 1,
+        messages: [],
+        stderr: decision.error,
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+        step,
+        errorMessage: decision.error,
+        suggestedGrade: invocation.suggestedGrade,
+        finalGrade: invocation.finalGrade,
+      };
+    }
+    selectedModel = decision.selectedModelId;
+    selectionReason = decision.selectionReason;
+    fallbackReason = decision.fallbackReason;
+  }
+
   const args: string[] = ["--mode", "json", "-p", "--no-session"];
-  if (invocation.requestedModel ?? agent.model) args.push("--model", invocation.requestedModel ?? agent.model);
+  if (selectedModel) args.push("--model", selectedModel);
   if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
   if (agent.extensions) {
     for (const ext of agent.extensions) {
@@ -321,10 +369,12 @@ async function runSingleAgent(
     messages: [],
     stderr: "",
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
-    model: invocation.requestedModel ?? agent.model,
+    model: selectedModel,
     requestedModel: invocation.requestedModel,
     suggestedGrade: invocation.suggestedGrade,
     finalGrade: invocation.finalGrade,
+    selectionReason,
+    fallbackReason,
     step,
   };
 
@@ -845,6 +895,19 @@ export default function (pi: ExtensionAPI) {
           filesChanged: summary.filesChanged,
           testsRan: summary.testsRan,
           tddViolations: result.tddViolations ?? 0,
+          selection: result.suggestedGrade && result.finalGrade
+            ? describeModelSelection(getAgentTypeForAgentName(result.agent) ?? "worker", {
+                agentType: getAgentTypeForAgentName(result.agent) ?? "worker",
+                suggestedGrade: result.suggestedGrade,
+                finalGrade: result.finalGrade,
+                selectedModelId: result.model,
+                eligibleModels: [],
+                requiredCapabilities: {},
+                overrideUsed: Boolean(result.requestedModel),
+                fallbackReason: result.fallbackReason,
+                selectionReason: result.selectionReason ?? "static agent model",
+              })
+            : undefined,
         };
         const isError = result.exitCode !== 0 || result.stopReason === "error" || result.stopReason === "aborted";
         if (isError) {
