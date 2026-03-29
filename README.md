@@ -325,7 +325,7 @@ subagent({
 })
 ```
 
-When you provide a `model` override, prefer provider-qualified IDs such as `openai-codex/gpt-5.4` or `google-gemini-cli/gemini-2.5-flash`. Bare built-in IDs are normalized before launch.
+When you provide a `model` override, prefer provider-qualified IDs such as `openai-codex/gpt-5.4` or `google-gemini-cli/gemini-2.5-flash`. Bare built-in IDs are normalized before launch; other bare ids fail clearly and must be provider-qualified.
 
 See [`docs/subagent-model-selection.md`](docs/subagent-model-selection.md) for details.
 

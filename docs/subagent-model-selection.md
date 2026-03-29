@@ -51,7 +51,7 @@ subagent({
 })
 ```
 
-If `model` is provided, that explicit override wins. Prefer provider-qualified IDs. Bare built-in IDs are normalized before launch so `gemini-2.5-flash` becomes `google-gemini-cli/gemini-2.5-flash` instead of relying on provider inference.
+If `model` is provided, that explicit override wins. Prefer provider-qualified IDs. Bare built-in IDs are normalized before launch so `gemini-2.5-flash` becomes `google-gemini-cli/gemini-2.5-flash`; other bare ids fail clearly instead of relying on provider inference.
 
 ## Selection visibility
 

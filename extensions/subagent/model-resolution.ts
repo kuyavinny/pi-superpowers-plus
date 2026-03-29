@@ -1,5 +1,3 @@
-import { execFileSync } from "node:child_process";
-
 export interface AvailableModel {
   provider: string;
   model: string;
@@ -40,14 +38,6 @@ export function parseListModelsOutput(output: string): AvailableModel[] {
     .filter((entry): entry is AvailableModel => Boolean(entry));
 }
 
-export function listAvailableModels(): AvailableModel[] {
-  const output = execFileSync("pi", ["--list-models"], {
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  return parseListModelsOutput(output);
-}
-
 export function qualifyModelReference(
   modelReference: string,
   options?: { availableModels?: AvailableModel[] },
@@ -60,20 +50,7 @@ export function qualifyModelReference(
   const curated = KNOWN_PROVIDER_QUALIFIED_MODELS[baseReference];
   if (curated) return `${curated}${suffix}`;
 
-  const availableModels = options?.availableModels ?? listAvailableModels();
-  const matches = availableModels.filter((entry) => entry.model === baseReference);
-
-  if (matches.length === 1) {
-    const match = matches[0];
-    return `${match.provider}/${match.model}${suffix}`;
-  }
-
-  if (matches.length > 1) {
-    throw new Error(
-      `Ambiguous bare model reference \"${modelReference}\". Specify provider explicitly (for example \"${matches[0].provider}/${baseReference}${suffix}\").`,
-    );
-  }
-
+  void options;
   throw new Error(
     `Unknown bare model reference \"${modelReference}\". Specify provider explicitly as \"provider/${baseReference}${suffix}\".`,
   );
