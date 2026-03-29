@@ -621,6 +621,7 @@ async function runSingleAgent(
     const modelNotFound =
       currentResult.exitCode !== 0 &&
       invocation.allowDynamicSelection &&
+      !invocation.requestedModel &&
       agentType &&
       currentResult.model &&
       /model\s+.+\s+not found/i.test(currentResult.stderr);

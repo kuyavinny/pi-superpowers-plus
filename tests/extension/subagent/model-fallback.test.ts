@@ -85,4 +85,33 @@ describe("dynamic model fallback", () => {
     expect(result.details.selection.selectedModel).toBe("anthropic/claude-sonnet-4-5");
     expect(result.details.selection.fallbackReason).toBe("openai-codex/gpt-5-mini unavailable");
   });
+
+  test("explicit model overrides fail once instead of retrying fallback when the override model is unavailable", async () => {
+    spawnMock
+      .mockImplementationOnce(() => createFakeProcess(1, "Model openai-codex/not-a-real-model not found"))
+      .mockImplementationOnce(() => {
+        throw new Error("explicit override should not be retried");
+      });
+
+    const tool = registerTool();
+    const result = await tool.execute(
+      "id",
+      {
+        agent: "implementer",
+        task: "Implement auth retry handling in src/auth.ts with matching tests",
+        grade: "standard",
+        model: "openai-codex/not-a-real-model",
+      },
+      undefined,
+      undefined,
+      { cwd: process.cwd(), hasUI: false },
+    );
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(result.details.status).toBe("failed");
+    expect(result.details.selection.selectedModel).toBe("openai-codex/not-a-real-model");
+    expect(result.details.selection.overrideUsed).toBe(true);
+    expect(result.details.selection.selectionReason).toBe("requested model override");
+    expect(result.content[0].text).toContain("Model openai-codex/not-a-real-model not found");
+  });
 });
